@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>НТД РФ · электроснабжение нефтегазовых месторождений</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <div class="wrap head">
+      <div class="brand">
+        <div class="logo">ЭС</div>
+        <div>
+          <h1>НТД РФ</h1>
+          <p>Нормы, ГОСТ, СП и правила для раздела ЭС промысла</p>
+        </div>
+      </div>
+      <nav id="nav">
+        <a class="navlink" href="index.html">Главная</a>
+        <a class="navlink active" href="ntd.html">НТД РФ</a>
+        <a class="navlink accent-link" href="https://pafnusha.github.io/rtm-electrical-loads/" target="_blank" rel="noopener">Расчёт нагрузок</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+    <div class="hero">
+      <h2>Нормативная литература по электроснабжению нефтегазовых объектов</h2>
+      <p>Отдельная страница только с перечнем НТД РФ / ЕАЭС. Расчёт нагрузок — отдельная кнопка в шапке.</p>
+    </div>
+    <div class="card">
+      <div class="toolbar">
+        <input id="q" placeholder="Поиск: ПУЭ, взрывоопасн, кабель, молния, ФНП..." />
+        <select id="cat">
+          <option value="">Все категории</option>
+          <option>Закон / ТР</option>
+          <option>ФНП / ПБ</option>
+          <option>Отраслевой ГОСТ</option>
+          <option>Электроустановки</option>
+          <option>Взрывозащита</option>
+          <option>Кабели / ПБ кабелей</option>
+          <option>Заземление / молниезащита</option>
+          <option>Нагрузки / качество ЭЭ</option>
+          <option>ПД / оформление</option>
+        </select>
+      </div>
+      <div style="overflow:auto; max-height: 72vh;">
+        <table>
+          <thead>
+            <tr>
+              <th>Обозначение</th>
+              <th>Наименование</th>
+              <th>Зачем проектировщику ЭС</th>
+              <th>Категория</th>
+              <th>Примечание</th>
+            </tr>
+          </thead>
+          <tbody id="ntdBody"></tbody>
+        </table>
+      </div>
+      <p class="note" style="margin-top:10px">Статус проверяйте по eesk.ru / protect.gost.ru / publication.pravo.gov.ru.</p>
+    </div>
+  </main>
+  <footer class="wrap">ЭС-Нефтегаз · страница НТД РФ</footer>
+  <script src="app.js"></script>
+</body>
+</html>
