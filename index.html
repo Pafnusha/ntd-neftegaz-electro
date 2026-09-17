@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ЭС-Нефтегаз · справочник проектировщика электроснабжения</title>
-  <meta name="description" content="НТД РФ, формулы и расчёты для проектирования электроснабжения нефтегазовых месторождений" />
+  <title>ЭС-Нефтегаз · главная</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -17,161 +16,33 @@
           <p>Справочник проектировщика электроснабжения месторождений</p>
         </div>
       </div>
-      <nav id="nav">
-        <button class="active" data-tab="home">Главная</button>
-        <button data-tab="ntd">НТД</button>
-        <button data-tab="formulas">Формулы</button>
-        <button data-tab="calc">Калькуляторы</button>
-        <button data-tab="hints">Подсказки</button>
-        <button data-tab="check">Чек-лист</button>
+      <nav>
+        <a class="navlink active" href="index.html">Главная</a>
+        <a class="navlink" href="ntd.html">НТД РФ</a>
+        <a class="navlink" href="https://pafnusha.github.io/rtm-electrical-loads/" target="_blank" rel="noopener">Расчёт нагрузок</a>
       </nav>
     </div>
   </header>
   <main class="wrap">
-    <section id="home">
-      <div class="hero">
-        <h2>Нормы, расчёты и подсказки для раздела ЭС промысла</h2>
-        <p>Сайт для инженера-проектировщика систем электроснабжения объектов обустройства нефтяных и газовых месторождений. Сведена актуальная на сентябрь 2026 г. нормативная база РФ / ЕАЭС, рабочие формулы и быстрые расчёты. Перед выпуском ПД/РД сверяйте статус документа по официальным источникам.</p>
-        <div class="grid">
-          <div class="kpi"><b>40+</b><span>ключевых НТД в таблице</span></div>
-          <div class="kpi"><b>7</b><span>рабочих калькуляторов</span></div>
-          <div class="kpi"><b>Ex / I кат.</b><span>зоны, надёжность, СПЗ</span></div>
-          <div class="kpi"><b>ПД ЭС</b><span>чеклист комплекта раздела</span></div>
-        </div>
-      </div>
-      <div class="card">
-        <h3>Как пользоваться</h3>
-        <p class="note">1) НТД — фильтр по теме.<br>2) Формулы — опорные выражения.<br>3) Калькуляторы — прикидка (не заменяют ПУЭ).<br>4) Подсказки и чек-лист — экспертиза и состав раздела.</p>
-        <p class="note warn" style="margin-top:12px">Справочник, не официальное издание норм. Приоритет: ПУЭ 7, ФНП №534, ГОСТ Р 58367, СП 423, ТР ТС 012.</p>
-      </div>
-    </section>
-    <section id="ntd" class="hidden">
-      <div class="card">
-        <h3>Нормативная литература по электроснабжению нефтегазовых объектов</h3>
-        <div class="toolbar">
-          <input id="q" placeholder="Поиск: ПУЭ, взрывоопасн, кабель, молния, ФНП..." />
-          <select id="cat">
-            <option value="">Все категории</option>
-            <option>Закон / ТР</option>
-            <option>ФНП / ПБ</option>
-            <option>Отраслевой ГОСТ</option>
-            <option>Электроустановки</option>
-            <option>Взрывозащита</option>
-            <option>Кабели / ПБ кабелей</option>
-            <option>Заземление / молниезащита</option>
-            <option>Нагрузки / качество ЭЭ</option>
-            <option>ПД / оформление</option>
-          </select>
-        </div>
-        <div style="overflow:auto; max-height: 72vh;">
-          <table>
-            <thead><tr><th>Обозначение</th><th>Наименование</th><th>Зачем проектировщику ЭС</th><th>Категория</th><th>Примечание</th></tr></thead>
-            <tbody id="ntdBody"></tbody>
-          </table>
-        </div>
-        <p class="note" style="margin-top:10px">Статус проверяйте по eesk.ru / protect.gost.ru / publication.pravo.gov.ru. Перечень стандартов к ТР ТС 012 обновляется ЕЭК.</p>
-      </div>
-    </section>
-    <section id="formulas" class="hidden">
-      <div class="card">
-        <h3>Рабочие формулы</h3>
-        <h4>1. Ток трёхфазного ЭП</h4>
-        <div class="formula">I = P / (√3 · U · cosφ · η) [A], P в Вт, U в В</div>
-        <h4>2. Расчётная нагрузка (РТМ 36.18.32.4-92)</h4>
-        <div class="formula">Pр = Kр · Pсм</div>
-        <h4>3. Потеря напряжения</h4>
-        <div class="formula">ΔU% ≈ (√3 · I · L · (r·cosφ + x·sinφ) · 100) / U</div>
-        <h4>4. Экономическое сечение</h4>
-        <div class="formula">Sэк = I / jэк</div>
-        <h4>5. УКРМ</h4>
-        <div class="formula">Qк = P · (tgφ1 − tgφ2)</div>
-        <h4>6. Ex EPL</h4>
-        <div class="formula">зона 0 → Ga; зона 1 → Ga/Гb; зона 2 → Ga/Gb/Gc</div>
-        <p class="note">ГОСТ 31610.10-1-2022 с 01.07.2026; до этой даты ГОСТ IEC 60079-10-1-2013. Монтаж: ГОСТ IEC 60079-14, СП 423.1325800.2018.</p>
-        <h4>7. Категории надёжности (ПУЭ 1.2)</h4>
-        <div class="formula">I — два независимых источника + АВР; особая группа I — третий источник (ДЭС/ИБП)</div>
-        <h4>8. Заземление и молниезащита</h4>
-        <div class="formula">ПУЭ 1.7 + ГОСТ Р 50571.5.54; МЗ — СО 153-34.21.122-2003</div>
-      </div>
-    </section>
-    <section id="calc" class="hidden">
-      <div class="calc-grid">
-        <div class="card"><h3>Ток трёхфазного ЭП</h3>
-          <label>Мощность P, кВт</label><input id="iP" type="number" value="160">
-          <label>Напряжение U, кВ</label><input id="iU" type="number" value="0.4" step="0.1">
-          <label>cosφ</label><input id="iCos" type="number" value="0.85" step="0.01">
-          <label>КПД η</label><input id="iEta" type="number" value="0.94" step="0.01">
-          <button onclick="calcI()">Рассчитать</button><div class="result" id="iOut">Ожидание расчёта</div></div>
-        <div class="card"><h3>Потеря напряжения ΔU</h3>
-          <label>Ток I, А</label><input id="dI" type="number" value="250">
-          <label>Длина L, км</label><input id="dL" type="number" value="0.35" step="0.01">
-          <label>U линейное, В</label><input id="dU" type="number" value="380">
-          <label>r, Ом/км</label><input id="dR" type="number" value="0.195" step="0.001">
-          <label>x, Ом/км</label><input id="dX" type="number" value="0.073" step="0.001">
-          <label>cosφ</label><input id="dC" type="number" value="0.85" step="0.01">
-          <button onclick="calcDU()">Рассчитать</button><div class="result" id="dOut">Ожидание расчёта</div></div>
-        <div class="card"><h3>Компенсация Q</h3>
-          <label>P, кВт</label><input id="qP" type="number" value="800">
-          <label>cosφ1</label><input id="q1" type="number" value="0.78" step="0.01">
-          <label>cosφ2</label><input id="q2" type="number" value="0.95" step="0.01">
-          <button onclick="calcQ()">Рассчитать</button><div class="result" id="qOut">Ожидание расчёта</div></div>
-        <div class="card"><h3>Сечение по jэк</h3>
-          <label>I, А</label><input id="sI" type="number" value="280">
-          <label>jэк, А/мм²</label>
-          <select id="sJ"><option value="1.4">Al 1-3 кВ, Tmax=5000 → 1,4</option><option value="3.0" selected>Cu 1-3 кВ, Tmax до 5000 → 3,0</option><option value="2.5">Cu Tmax 5000-8760 → 2,5</option></select>
-          <button onclick="calcS()">Рассчитать</button><div class="result" id="sOut">Ожидание расчёта</div></div>
-        <div class="card"><h3>Загрузка трансформатора</h3>
-          <label>Sт, кВА</label><input id="tS" type="number" value="1000">
-          <label>Pр, кВт</label><input id="tP" type="number" value="620">
-          <label>cosφ</label><input id="tC" type="number" value="0.9" step="0.01">
-          <button onclick="calcT()">Рассчитать</button><div class="result" id="tOut">Ожидание расчёта</div></div>
-        <div class="card"><h3>Выбор Ex-оборудования</h3>
-          <label>Среда</label><select id="exEnv"><option>Газ / пар (II)</option><option>Пыль (III)</option></select>
-          <label>Зона</label><select id="exZ"><option>0</option><option selected>1</option><option>2</option><option>20</option><option>21</option><option>22</option></select>
-          <label>Подгруппа</label><select id="exG"><option>IIA</option><option selected>IIB</option><option>IIC</option></select>
-          <label>t самовоспл., °C</label><input id="exT" type="number" value="230">
-          <button onclick="calcEx()">Подобрать</button><div class="result" id="exOut">Ожидание расчёта</div></div>
-        <div class="card"><h3>Ток КЗ фаза-нуль (упрощ.)</h3>
-          <label>Uф, В</label><input id="kU" type="number" value="220">
-          <label>Zпетли, Ом</label><input id="kZ" type="number" value="0.35" step="0.01">
-          <button onclick="calcK()">Рассчитать</button><div class="result" id="kOut">Ожидание расчёта</div></div>
-      </div>
-    </section>
-    <section id="hints" class="hidden">
-      <div class="card">
-        <h3>Подсказки проектировщику промысла</h3>
-        <ul class="hints">
-          <li><b>Сначала технология, потом электрика.</b> Зону и категорию ЭП задают совместно (ФНП №534, серия 60079).</li>
-          <li><b>Не путать В-I ПУЭ и зоны 0/1/2 IEC.</b> Для нового оборудования — ТР ТС 012 + СП 423.</li>
-          <li><b>ЭЦН, ППД, ДНС, УПН, СПЗ, ПАЗ</b> — обычно I категория / особая группа. ДЭС с пуском без внешней сети.</li>
-          <li><b>Кабели во взрывоопасных зонах:</b> броня, нг, эстакады; FR — цепи СПЗ.</li>
-          <li><b>Север:</b> Tamb в сертификате Ex часто −60 °C, не стандарт −20...+40.</li>
-          <li><b>ПЧ ЭЦН</b> сажают качество ЭЭ — ГОСТ 32144, фильтры, выделение трансформаторов.</li>
-          <li><b>Молниезащита РВС и факела</b> по СО 153-34.21.122-2003, УЗИП, уравнивание с трубопроводами.</li>
-          <li><b>Трубопровод — не единственный заземлитель.</b></li>
-        </ul>
-      </div>
-    </section>
-    <section id="check" class="hidden">
-      <div class="card checklist">
-        <h3>Чек-лист раздела ЭС обустройства</h3>
-        <label class="row"><input type="checkbox"> ТЗ, ТУ техприсоединения, категории ЭП</label>
-        <label class="row"><input type="checkbox"> Схема внешнего ЭС, баланс мощности, ПКЭ</label>
-        <label class="row"><input type="checkbox"> Категории надёжности по объектам и СПЗ</label>
-        <label class="row"><input type="checkbox"> ДЭС / ИБП / ЩПТ, АВР, автозапуск</label>
-        <label class="row"><input type="checkbox"> План взрывоопасных зон и спецификация Ex</label>
-        <label class="row"><input type="checkbox"> Расчёт нагрузок и выбор трансформаторов</label>
-        <label class="row"><input type="checkbox"> Кабели: нагрев, ΔU, КЗ, пожар, холод</label>
-        <label class="row"><input type="checkbox"> РЗиА, учёт ЭЭ</label>
-        <label class="row"><input type="checkbox"> Заземление, МЗ, УЗИП</label>
-        <label class="row"><input type="checkbox"> Освещение рабочее/аварийное включая Ex</label>
-        <label class="row"><input type="checkbox"> Питание СПЗ/ПАЗ, огнестойкие линии</label>
-        <label class="row"><input type="checkbox"> Чертежи и спецификации по ГОСТ Р 21.101 и ПП №87</label>
-        <p class="note" id="chkStat"></p>
-      </div>
-    </section>
+    <div class="hero">
+      <h2>Два рабочих модуля</h2>
+      <p>НТД РФ собраны на отдельной странице. Расчёт электрических нагрузок по РТМ 36.18.32.4-92 открывается отдельным калькулятором.</p>
+    </div>
+    <div class="choice-grid">
+      <a class="choice" href="ntd.html">
+        <span class="choice-kicker">Справочник</span>
+        <h3>НТД РФ</h3>
+        <p>Таблица законов, ФНП, ГОСТ, СП и ПУЭ для раздела ЭС обустройства.</p>
+        <span class="choice-btn">Открыть таблицу НТД</span>
+      </a>
+      <a class="choice choice-alt" href="https://pafnusha.github.io/rtm-electrical-loads/" target="_blank" rel="noopener">
+        <span class="choice-kicker">Калькулятор</span>
+        <h3>Расчёт нагрузок</h3>
+        <p>Расчёт нагрузок по РТМ 36.18.32.4-92 с экспортом в Excel.</p>
+        <span class="choice-btn">Открыть расчёт нагрузок</span>
+      </a>
+    </div>
   </main>
-  <footer class="wrap">ЭС-Нефтегаз · сентябрь 2026 · github.com/Pafnusha/ntd-neftegaz-electro</footer>
-  <script src="app.js"></script>
+  <footer class="wrap">ЭС-Нефтегаз · github.com/Pafnusha/ntd-neftegaz-electro</footer>
 </body>
 </html>
