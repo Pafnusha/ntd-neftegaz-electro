@@ -36,8 +36,6 @@
     table.ep th{text-align:left;background:#f0f4fa;color:var(--muted);font-size:.72rem;padding:.5rem .4rem}
     table.ep td{padding:.28rem .32rem;border-bottom:1px solid #eef1f6}
     table.ep input{width:100%;padding:.3rem .35rem;border:1px solid transparent;border-radius:6px;background:#f8fafc}
-    table.ep input:focus{border-color:var(--accent);background:#fff;outline:0}
-    .col-calc{font-family:Consolas,monospace;white-space:nowrap}
     footer{text-align:center;color:var(--muted);font-size:.8rem;margin-top:1rem}
     a{color:var(--accent)}
   </style>
@@ -47,7 +45,7 @@
   <header>
     <span class="badge">РТМ 36.18.32.4-92 · ведомость · КУ</span>
     <h1>Расчёт электрических нагрузок</h1>
-    <p class="sub">Строки ЭП, ИТОГО, Ко и конденсаторная установка по cosφ проектировщика.
+    <p class="sub">ИТОГО, Ко и КУ по cosφ. Excel — только числа, без формул.
       <a href="index.html">Главная</a> · <a href="ntd.html">НТД РФ</a></p>
   </header>
   <section class="panel">
@@ -126,10 +124,9 @@
         <tbody id="ep-tbody"></tbody>
       </table>
     </div>
-    <p class="note">Qку = Рр·Ко · (tgφ₁ − tgφ₂). ИТОГО входит в расчёт КУ.</p>
   </section>
   <footer>ЭС-Нефтегаз</footer>
 </div>
-<script src="loads-app.js"></script>
+<script src="loads-app.js?v=5"></script>
 </body>
 </html>
