@@ -39,7 +39,7 @@
 <div class="wrap">
   <span class="badge">ГОСТ 32144 · пуск ВН ЭД</span>
   <h1>Пуск высоковольтного двигателя</h1>
-  <p class="sub">Источник ПС 35/10 или сеть/ЗРУ 10 кВ, ветки РУ 10 кВ. <a href="index.html">Главная</a> · <a href="loads.html">Нагрузки</a> · <a href="ntd.html">НТД</a></p>
+  <p class="sub">Источник ПС 35/10 или сеть/ЗРУ 10 кВ. <a href="index.html">Главная</a> · <a href="loads.html">Нагрузки</a> · <a href="ntd.html">НТД</a></p>
   <section class="panel"><h2>1. Источник питания</h2>
     <div class="grid">
       <label class="field">Тип источника<select id="src-type"><option value="ps35">ПС 35/10 кВ</option><option value="grid10">Сеть / ЗРУ 10 кВ</option></select></label>
@@ -63,8 +63,8 @@
       <label class="field">x ввода, мОм<input id="xkv10" type="number" step="0.001" value="0.012"></label>
     </div>
   </section>
-  <section class="panel"><h2>2. Ветки 10 кВ (ЗРУ / РУ / КЛ). ЭД после последней ветки</h2>
-    <p class="note">Цепочка: ПС → ЗРУ → РУ → фидер ЭД. P на промежуточных шинах — без пускаемого двигателя.</p>
+  <section class="panel"><h2>2. Ветки 10 кВ</h2>
+    <p class="note">ПС → ЗРУ → РУ → фидер ЭД. На фидере ЭД задайте P = 0.</p>
     <div class="toolbar"><button type="button" id="btn-add">+ Добавить ветку</button><button type="button" id="btn-demo">Пример 16 МВ·А</button></div>
     <div style="overflow:auto;margin-top:.7rem"><table><thead><tr><th>Имя</th><th>L, км</th><th>r0</th><th>x0</th><th>P, кВт</th><th>cosφ</th><th>r выкл.</th><th>x выкл.</th><th></th></tr></thead><tbody id="br-body"></tbody></table></div>
   </section>
@@ -93,13 +93,11 @@
   </section>
   <section class="panel"><h2>Инструкция</h2>
     <div class="help">
-      <p><b>1.</b> ПС 35/10 — Sнт, Pк, uк, Iкз 35 кВ. Сеть 10 кВ — Iкз³ на шинах 10 кВ.</p>
-      <p><b>2.</b> P источника — без пускаемого ЭД.</p>
-      <p><b>3.</b> Ветки по схеме, последняя — кабель к электродвигателю (P=0).</p>
-      <p><b>4.</b> r0/x0 из каталога. Допуск 10% по ГОСТ 32144, для пуска по ПУЭ можно 15%.</p>
-      <p><b>5.</b> Кнопка «Пример 16 МВ·А» — ваш расчёт из PDF.</p>
+      <p><b>1.</b> ПС 35/10 — Sнт, Pк, uк, Iкз 35 кВ. Сеть 10 кВ — Iкз на 10 кВ.</p>
+      <p><b>2.</b> Word содержит формулы, схему замещения и выводы на русском.</p>
     </div>
   </section>
 </div>
-<script src="start-app.js"></script>
+<script src="start-app.js?v=2"></script>
+<script src="start-word.js?v=1"></script>
 </body></html>
