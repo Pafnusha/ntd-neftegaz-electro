@@ -45,7 +45,7 @@
   <header>
     <span class="badge">РТМ 36.18.32.4-92 · ведомость · КУ</span>
     <h1>Расчёт электрических нагрузок</h1>
-    <p class="sub">ИТОГО, Ко и КУ по cosφ. Excel — только числа, без формул.
+    <p class="sub">ИТОГО, Ко и КУ. Выгрузка в Excel и Word — числа без формул.
       <a href="index.html">Главная</a> · <a href="ntd.html">НТД РФ</a></p>
   </header>
   <section class="panel">
@@ -72,6 +72,7 @@
     </div>
     <div class="toolbar">
       <button type="button" class="primary" id="btn-excel">Скачать Excel</button>
+      <button type="button" class="primary" id="btn-word">Скачать Word</button>
       <button type="button" id="btn-save-json">Сохранить JSON</button>
       <button type="button" id="btn-load-json">Загрузить JSON</button>
       <input id="file-json" type="file" accept=".json,application/json" hidden>
@@ -127,6 +128,7 @@
   </section>
   <footer>ЭС-Нефтегаз</footer>
 </div>
-<script src="loads-app.js?v=5"></script>
+<script src="loads-app.js?v=6"></script>
+<script src="word-export.js?v=2"></script>
 </body>
 </html>
