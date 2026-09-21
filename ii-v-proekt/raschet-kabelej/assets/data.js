@@ -1,4 +1,4 @@
-/* data.js — Yamal-free source reconstituted from base64 parts */
+/* data.js — clean source reconstituted from base64 parts */
 (function(){
   var N=11, parts=[], i, x, base;
   try { base = (document.currentScript && document.currentScript.src || "").replace(/[^\/]+$/, ""); }
