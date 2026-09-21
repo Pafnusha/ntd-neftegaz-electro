@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>РАСЧЁТ КАБЕЛЕЙ • Сечения КЛ и ВЛ 0,4/10 кВ • NED-Plagum • Ямал СПГ • ПУЭ/ГОСТ/МЭК</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-logo">⚡</div>
+    <div>
+      <div class="brand-name">РАСЧЁТ КАБЕЛЕЙ 0,4 / 10 кВ</div>
+      <div class="brand-sub">NED-Plagum • Методика «Ямал СПГ» 3300-E-000-EL-PHI-00009-00-D • ПУЭ / ГОСТ / IEC 60364</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span id="autosaveState" class="autosave">—</span>
+    <button class="btn btn-ghost" id="btnTheme" title="Светлая/тёмная тема">🌓</button>
+  </div>
+</header>
+
+<nav class="tabs" id="tabsNav">
+  <button class="tab active" data-tab="home">Главная</button>
+  <button class="tab" data-tab="scheme">Схема сети</button>
+  <button class="tab" data-tab="quick">Расчёт линии</button>
+  <button class="tab" data-tab="catalog">Каталог кабелей</button>
+  <button class="tab" data-tab="udrop">Потери напряжения</button>
+  <button class="tab" data-tab="lossesTab">Потери энергии (НТД)</button>
+  <button class="tab" data-tab="report">Отчёт</button>
+  <button class="tab" data-tab="ntd">НТД и таблицы</button>
+  <button class="tab" data-tab="help">Инструкция</button>
+  <button class="tab" data-tab="tests">Тесты</button>
+</nav>
+
+<main id="main">
+
+  <!-- ============ ГЛАВНАЯ ============ -->
+  <section class="page active" id="page-home">
+    <div class="hero">
+      <h1>Автоматический выбор сечения кабельных и воздушных линий</h1>
+      <p>Программа рассчитывает линии <b>0,4 кВ</b> и <b>6/10 кВ</b> по критериям: длительно допустимый ток
+        с поправками на температуру среды, удельное сопротивление почвы и группировку;
+        расчётный ток нагрузки; допустимые потери напряжения; механическая прочность;
+        совместимость с максимальной токовой защитой (ПУЭ 3.1.10–3.1.12); термическая стойкость к КЗ
+        (адиабатическое уравнение, Ямал СПГ §7.10). База кабелей — каталоги <b>NED-Plagum 1 кВ (ЭПР)</b>
+        и <b>NED-Plagum SN 6–35 кВ (ЭПР)</b>, токи по таблицам IEC 60364-5-52 / IEC 60502-2 из документа Ямал СПГ.</p>
+      <div class="hero-actions">
+        <button class="btn btn-primary" data-goto="scheme">▶ Новый проект (схема сети)</button>
+        <button class="btn" id="btnWordHome" title="Word-отчёт по текущему проекту">📄 Выгрузить в Word</button>
+        <button class="btn" data-goto="catalog">Каталог NED-Plagum</button>
+        <button class="btn" data-goto="help">Инструкция</button>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h2>Шаблоны и примеры</h2>
+        <div id="templateList" class="template-list"></div>
+      </div>
+      <div class="card">
+        <h2>Проекты (сохранённые в этом браузере)</h2>
+        <div id="projectList" class="template-list"></div>
+        <div class="row-gap">
+          <button class="btn btn-sm" id="btnImportProject">📂 Импорт проекта (.json)</button>
+          <input type="file" id="fileImportProject" accept=".json" hidden>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Глобальные настройки расчёта</h2>
+      <div id="settingsForm"></div>
+    </div>
+  </section>
+
+  <!-- ============ СХЕТА ============ -->
+  <section class="page" id="page-scheme">
+    <div class="split">
+      <div class="split-left">
+        <div class="card">
+          <div class="card-head">
+            <h2>Объекты схемы <span class="muted" id="schemeProjectName"></span></h2>
+            <div class="btn-group">
+              <button class="btn btn-sm" id="btnAddGSP">+ ГСП / ЦП</button>
+              <button class="btn btn-sm" id="btnAddTRS">+ ТР / ТП</button>
+              <button class="btn btn-sm" id="btnAddZRU">+ ЗРУ</button>
+              <button class="btn btn-sm" id="btnAddLoad">+ Потребитель</button>
+            </div>
+          </div>
+          <div id="nodeTree" class="node-tree"></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h2>Линия выбранного элемента</h2>
+            <div class="btn-group">
+              <button class="btn btn-sm btn-primary" id="btnRecalc">⟳ Пересчитать всё</button>
+              <button class="btn btn-sm" id="btnWordScheme" title="Word-отчёт">📄 Word</button>
+            </div>
+          </div>
+          <div id="lineForm"></div>
+        </div>
+      </div>
+      <div class="split-right">
+        <div class="card">
+          <h2>Однолинейная схема (авто)</h2>
+          <div id="schemeCanvas" class="scheme-canvas"></div>
+        </div>
+        <div class="card">
+          <h2>Ведомость линий и замечаний</h2>
+          <div class="table-wrap"><table class="tbl" id="lineSummaryTable"></table></div>
+          <div id="remarksBox"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ БЫСТРЫЙ РАСЧЁТ ============ -->
+  <section class="page" id="page-quick">
+    <div class="split">
+      <div class="split-left">
+        <div class="card">
+          <h2>Исходные данные одной линии</h2>
+          <div id="quickForm"></div>
+          <div class="btn-group">
+            <button class="btn btn-primary" id="btnQuickCalc">Рассчитать</button>
+            <button class="btn" id="btnQuickToScheme">➕ Добавить в текущую схему</button>
+            <button class="btn btn-ghost" id="btnQuickPreset">Применить шаблон данных</button>
+          </div>
+          <div class="progress" id="quickProgress"><div class="progress-bar"></div></div>
+        </div>
+        <div class="card">
+          <h2>Обоснование выбора (по формулам)</h2>
+          <div id="quickFormulas" class="formula-box"></div>
+        </div>
+      </div>
+      <div class="split-right">
+        <div class="card">
+          <h2>Результат</h2>
+          <div id="quickResult"></div>
+        </div>
+        <div class="card">
+          <h2>Проверка всех сечений кандидата</h2>
+          <div class="table-wrap"><table class="tbl" id="quickTable"></table></div>
+        </div>
+        <div class="card">
+          <h2>Графики</h2>
+          <div class="grid2">
+            <div>
+              <div class="chart-title">I<sub>доп.факт</sub> и I<sub>р</sub> от сечения</div>
+              <div id="chartI" class="chart"></div>
+            </div>
+            <div>
+              <div class="chart-title">ΔU% от длины линии</div>
+              <div id="chartU" class="chart"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ КАТАЛОГ ============ -->
+  <section class="page" id="page-catalog">
+    <div class="card">
+      <div class="card-head">
+        <h2>Интерактивный каталог кабелей NED-Plagum</h2>
+        <input class="search" id="catalogSearch" placeholder="Поиск: сечение, марка, 4х95, броня…">
+      </div>
+      <div id="catalogFilters" class="chip-row"></div>
+      <p class="muted" id="catalogCount"></p>
+      <div class="table-wrap" style="max-height:60vh;overflow:auto">
+        <table class="tbl" id="catalogTable"></table>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Карточка кабеля</h2>
+      <div id="catalogDetail" class="muted">Выберите строку каталога…</div>
+    </div>
+  </section>
+
+  <!-- ============ ПОТЕРИ НАПРЯЖЕНИЯ ============ -->
+  <section class="page" id="page-udrop">
+    <div class="grid2">
+      <div class="card">
+        <h2>Калькулятор потерь напряжения (рушевой/участковый)</h2>
+        <div id="udropForm"></div>
+        <div class="table-wrap"><table class="tbl" id="udropTable"></table></div>
+        <div class="btn-group">
+          <button class="btn btn-sm" id="btnUDropAddSeg">+ участок</button>
+          <button class="btn btn-primary" id="btnUDropCalc">Рассчитать ΔU</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Результат</h2>
+        <div id="udropResult"></div>
+        <h3>Формулы (с подставленными числами)</h3>
+        <div class="formula-box" id="udropFormulas"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Потери напряжения на схеме (суммарно от источника до потребителя)</h2>
+      <div class="table-wrap"><table class="tbl" id="udropSchemeTable"></table></div>
+    </div>
+  </section>
+
+  <!-- ============ ПОТЕРИ ЭНЕРГИИ (НТД) ============ -->
+  <section class="page" id="page-lossesTab">
+    <div class="card">
+      <h2>Техническое электропотребление по «Методическим рекомендациям по определению потерь
+        электрической энергии в городских электрических сетях напряжением 10(6)-0,4 кВ»
+        (Роскоммунэнерго / ЗАО «АСУ Мособлэлектро», утверждены 23.04.2001)</h2>
+      <div id="mtdForm"></div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="btnMtdCalc">Рассчитать потери по схеме</button>
+        <button class="btn btn-ghost" id="btnMtdExample">Загрузить контрольный пример</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Результат (формулы 1–31 Методики)</h2>
+      <div class="table-wrap"><table class="tbl" id="mtdTable"></table></div>
+      <div id="mtdSummary"></div>
+      <details class="ntd-note" open>
+        <summary>Методика расчёта (применяемые формулы)</summary>
+        <div id="mtdMethod" class="formula-box"></div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ============ ОТЧЁТ ============ -->
+  <section class="page" id="page-report">
+    <div class="card">
+      <h2>Формирование отчёта</h2>
+      <div id="reportForm"></div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="btnDocWord">📄 Отчёт в Word (.doc)</button>
+        <button class="btn" id="btnDocExcel">📊 Таблица в Excel (.xls)</button>
+        <button class="btn" id="btnDocCSV">🧾 CSV</button>
+        <button class="btn" id="btnSchemePNG">🖼 Схема в PNG</button>
+        <button class="btn btn-ghost" id="btnPrint">🖨 Печать</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Предпросмотр</h2>
+      <div id="reportPreview" class="report-preview"></div>
+    </div>
+  </section>
+
+  <!-- ============ НТД ============ -->
+  <section class="page" id="page-ntd">
+    <div class="card">
+      <div class="card-head"><h2>Нормативные таблицы и коэффициенты</h2>
+      <input class="search" id="ntdSearch" placeholder="Поиск по разделам НТД…"></div>
+      <div id="ntdNav" class="chip-row"></div>
+    </div>
+    <div id="ntdSections"></div>
+  </section>
+
+  <!-- ============ ИНСТРУКЦИЯ ============ -->
+  <section class="page" id="page-help"><div id="helpContent"></div></section>
+
+  <!-- ============ ТЕСТЫ ============ -->
+  <section class="page" id="page-tests">
+    <div class="card">
+      <div class="card-head"><h2>Встроенная проверка расчётного ядра</h2>
+        <button class="btn btn-primary btn-sm" id="btnRunTests">▶ Запустить тесты</button></div>
+      <p class="muted">Контрольные примеры: коэффициенты Ямал СПГ (табл. 3), формула падения
+      напряжения, адиабатное уравнение, проверка ПУЭ 3.1.11, тесты выбора сечения по ДДТ/ΔU,
+      сверка с примером ведомости Методики потерь.</p>
+      <div class="table-wrap"><table class="tbl" id="testsTable"></table></div>
+      <div id="testsSummary"></div>
+    </div>
+  </section>
+
+</main>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/engine.js"></script>
+<script src="assets/ui.js"></script>
+<script src="assets/ui5.js"></script>
+<script src="assets/help.js"></script>
+<script src="assets/ui2.js"></script>
+<script src="assets/ui3.js"></script>
+<script src="assets/ui4.js"></script>
+<script src="assets/tests.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => { App.init(); });
+</script>
+</body>
+</html>
