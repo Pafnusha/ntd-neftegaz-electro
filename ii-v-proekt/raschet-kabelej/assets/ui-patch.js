@@ -1,7 +1,33 @@
-/* ui-patch.js — режим расчёта, нг, override-подписи, нейтрализация «Ямал» в UI */
+/* ui-patch.js — режим all/hv/lv, нг, автоподписи IEC, нейтрализация «Ямал» в UI */
 (function(){
   if(typeof App==="undefined") return;
   var A=App;
+
+  function repl(s){
+    return String(s==null?"":s)
+      .replace(/Ямал\s*СПГ/g,"проектная методика")
+      .replace(/Ямал\/IEC/g,"IEC/ПУЭ")
+      .replace(/√-формула \(Ямал\/IEC\)/g,"√-формула (IEC)")
+      .replace(/Ямал kGA/g,"kGA (проектн.)")
+      .replace(/Ямал табл\./g,"IEC табл.")
+      .replace(/\(Ямал табл\./g,"(IEC табл.")
+      .replace(/IEC\/Ямал/g,"IEC")
+      .replace(/Ямал §/g,"метод. §")
+      .replace(/стиль Ямал СПГ/g,"промплощадка")
+      .replace(/норм\. Ямал/g,"норм. проектн.")
+      .replace(/\(Ямал B52/g,"(IEC B52")
+      .replace(/Ямал/g,"IEC");
+  }
+  function scrubDom(root){
+    if(!root) return;
+    try{
+      var w=document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+      var n; while((n=w.nextNode())){
+        var t=n.nodeValue, r=repl(t);
+        if(r!==t) n.nodeValue=r;
+      }
+    }catch(e){}
+  }
 
   var _init=A.init;
   if(_init){ A.init=function(){
@@ -10,6 +36,8 @@
     if(this.settings.calcScope==null) this.settings.calcScope="all";
     if(this.settings.requireFire==null) this.settings.requireFire=false;
     if(!this.settings.fireClass) this.settings.fireClass="ng";
+    if(this.settings.standard==="yamal") this.settings.standard="iec";
+    if(this.settings.groupMode==="yamal") this.settings.groupMode="iec";
     var self=this;
     var sc=this.$ && this.$("#selCalcScope");
     if(sc){ sc.value=this.settings.calcScope||"all";
@@ -34,6 +62,7 @@
         } else if(self.$("#btnDocWord")) self.$("#btnDocWord").click();
       };}
     });
+    scrubDom(document.body);
     return r;
   };}
 
@@ -57,7 +86,11 @@
         if(self.lineInScope&&!self.lineInScope(n.line)) self.resMap[n.id]={skipped:true,res:null};
       });
     }
-    return _recalc.apply(this,arguments);
+    var r=_recalc.apply(this,arguments);
+    scrubDom(this.$&&this.$("#lineForm"));
+    scrubDom(this.$&&this.$("#remarksBox"));
+    scrubDom(this.$&&this.$("#lineSummaryTable"));
+    return r;
   };}
 
   A.srcOptionsFor=function(L){
@@ -70,6 +103,7 @@
     if(L.kind==="vl") o.push(["VL-AC","АС (ПУЭ 1.3.29)"],["VL-SIP","СИП‑4 (ГТП)"]);
     return o;
   };
+  A.srcOptions=A.srcOptionsFor;
 
   A.srcName=function(line){
     var m={
@@ -88,7 +122,7 @@
     var base=_mark.apply(this,arguments);
     if(line&&line.brand) base=line.brand+(b?" "+b.s+" мм²":"");
     if(line&&line.manualS!=null&&line.manualS!=="") base=(base||"")+" [ручн.]";
-    return base;
+    return repl(base);
   };}
 
   var _rs=A.renderSettings;
@@ -113,6 +147,7 @@
       var fc=host.querySelector("#patchFireClass");
       if(fc){ fc.value=self.settings.fireClass||"ng"; fc.onchange=function(){ self.settings.fireClass=fc.value; if(self.save)self.save(); }; }
     }
+    scrubDom(host);
     return r;
   };}
 
@@ -120,8 +155,8 @@
   if(_exp){ A.expandCatalog=function(){
     var rows=_exp.apply(this,arguments)||[];
     return rows.map(function(x){
-      if(x.brand) x.brand=String(x.brand).replace(/Ямал\s*СПГ/g,"проектная методика").replace(/Ямал/g,"IEC");
-      if(x.note) x.note=String(x.note).replace(/Ямал/g,"IEC");
+      if(x.brand) x.brand=repl(x.brand);
+      if(x.note) x.note=repl(x.note);
       return x;
     });
   };}
@@ -134,40 +169,28 @@
     return "auto";
   };
 
-  A.srcOptions=A.srcOptionsFor;
+  var _tmpl=A.templates;
+  if(_tmpl){ A.templates=function(){
+    return _tmpl.apply(this,arguments).map(function(p){ p.name=repl(p.name); return p; });
+  };}
 
-  (function neutralizeLabels(){
-    var repl=function(s){ return String(s==null?"":s)
-      .replace(/Ямал\s*СПГ/g,"проектная методика")
-      .replace(/Ямал\/IEC/g,"IEC/ПУЭ")
-      .replace(/Ямал kGA/g,"kGA (проектн.)")
-      .replace(/Ямал табл\./g,"IEC табл.")
-      .replace(/Ямал §/g,"метод. §")
-      .replace(/стиль Ямал СПГ/g,"промплощадка")
-      .replace(/Ямал/g,"IEC"); };
-    var _tmpl=A.templates;
-    if(_tmpl){ A.templates=function(){
-      return _tmpl.apply(this,arguments).map(function(p){ p.name=repl(p.name); return p; });
-    };}
-    var _qw=A.quickWord;
-    if(_qw){ A.quickWord=function(){
-      if(!this.rep) this.rep={};
-      if(!this.rep.base) this.rep.base={value:"3300-E-000-EL-PHI-00009-00-D; ПУЭ; ГОСТ; IEC; NED-Plagum"};
-      else if(this.rep.base && this.rep.base.value) this.rep.base.value=repl(this.rep.base.value);
-      return _qw.apply(this,arguments);
-    };}
-    var _rs2=A.renderSettings;
-    if(_rs2){ A.renderSettings=function(){
-      var r=_rs2.apply(this,arguments);
-      var box=this.$&&this.$("#settingsForm");
-      if(box){ box.querySelectorAll("option,b,span,label,h3").forEach(function(el){
-        if(el.childNodes.length===1 && el.firstChild.nodeType===3){
-          var t=el.firstChild.nodeValue; var n=repl(t); if(n!==t) el.firstChild.nodeValue=n;
-        }
-      }); }
+  var _qw=A.quickWord;
+  if(_qw){ A.quickWord=function(){
+    if(!this.rep) this.rep={};
+    if(!this.rep.base) this.rep.base={value:"3300-E-000-EL-PHI-00009-00-D; ПУЭ; ГОСТ; IEC; NED-Plagum"};
+    else if(this.rep.base && this.rep.base.value) this.rep.base.value=repl(this.rep.base.value);
+    return _qw.apply(this,arguments);
+  };}
+
+  ["renderLineForm","renderQuickForm","renderCatalog","renderTemplates","renderNTD","renderHelp"].forEach(function(fn){
+    var orig=A[fn];
+    if(typeof orig!=="function") return;
+    A[fn]=function(){
+      var r=orig.apply(this,arguments);
+      scrubDom(document.getElementById("main")||document.body);
       return r;
-    };}
-  })();
+    };
+  });
 
-  if(typeof console!=="undefined") console.info("[ui-patch] active: calcScope / нг / no-Yamal labels");
+  if(typeof console!=="undefined") console.info("[ui-patch] active: calcScope / нг / no-Yamal UI");
 })();
