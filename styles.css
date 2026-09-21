@@ -73,4 +73,9 @@ footer { color: var(--muted); font-size: 12px; padding: 24px 0 40px; }
   font-weight: 700; padding: 10px 14px; border-radius: 10px;
 }
 .choice-alt .choice-btn { background: var(--accent2); color: #06221f; }
+/* отдельная карточка на главной странице: внешний разбор, ширину ограничиваем */
+.choice-sep { margin: 26px 0 0; color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.choice-grid.single { grid-template-columns: repeat(auto-fill, minmax(280px, 520px)); margin-top: 12px; }
+.choice-ext .choice-kicker { color: var(--accent); }
+.choice-ext .choice-btn::after { content: " \2197"; }
 @media (max-width: 700px) { .hero h2 { font-size: 22px; } th { position: static; } }
