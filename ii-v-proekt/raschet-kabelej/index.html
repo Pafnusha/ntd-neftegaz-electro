@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>РАСЧЁТ КАБЕЛЕЙ • Сечения КЛ и ВЛ 0,4/10 кВ • NED-Plagum • Ямал СПГ • ПУЭ/ГОСТ/МЭК</title>
+<title>РАСЧЁТ КАБЕЛЕЙ • Сечения КЛ и ВЛ 0,4/10 кВ • NED-Plagum • IEC / ПУЭ / ГОСТ</title>
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -12,7 +12,7 @@
     <div class="brand-logo">⚡</div>
     <div>
       <div class="brand-name">РАСЧЁТ КАБЕЛЕЙ 0,4 / 10 кВ</div>
-      <div class="brand-sub">NED-Plagum • Методика «Ямал СПГ» 3300-E-000-EL-PHI-00009-00-D • ПУЭ / ГОСТ / IEC 60364</div>
+      <div class="brand-sub">NED-Plagum • 3300-E-000-EL-PHI-00009-00-D • ПУЭ / ГОСТ / IEC</div>
     </div>
   </div>
   <div class="topbar-right">
@@ -36,16 +36,17 @@
 
 <main id="main">
 
-  <!-- ============ ГЛАВНАЯ ============ -->
   <section class="page active" id="page-home">
     <div class="hero">
       <h1>Автоматический выбор сечения кабельных и воздушных линий</h1>
-      <p>Программа рассчитывает линии <b>0,4 кВ</b> и <b>6/10 кВ</b> по критериям: длительно допустимый ток
+      <p>Программа рассчитывает линии <b>0,4 кВ</b> и <b>6/10(35) кВ</b> по критериям: длительно допустимый ток
         с поправками на температуру среды, удельное сопротивление почвы и группировку;
         расчётный ток нагрузки; допустимые потери напряжения; механическая прочность;
         совместимость с максимальной токовой защитой (ПУЭ 3.1.10–3.1.12); термическая стойкость к КЗ
-        (адиабатическое уравнение, Ямал СПГ §7.10). База кабелей — каталоги <b>NED-Plagum 1 кВ (ЭПР)</b>
-        и <b>NED-Plagum SN 6–35 кВ (ЭПР)</b>, токи по таблицам IEC 60364-5-52 / IEC 60502-2 из документа Ямал СПГ.</p>
+        (адиабатическое уравнение, метод. §7.10 / IEC); <b>невозгораемость</b> (нг / ГОСТ 31565).
+        База кабелей — каталоги <b>NED-Plagum 1 кВ (ЭПР)</b> и <b>NED-Plagum SN 6–35 кВ (ЭПР)</b>,
+        токи по таблицам IEC 60364-5-52 / IEC 60502-2 и проектной методике 3300-E-000-EL-PHI-00009-00-D.
+        Режим: вся цепочка / только 10 кВ / только 0,4 кВ.</p>
       <div class="hero-actions">
         <button class="btn btn-primary" data-goto="scheme">▶ Новый проект (схема сети)</button>
         <button class="btn" id="btnWordHome" title="Word-отчёт по текущему проекту">📄 Выгрузить в Word</button>
@@ -64,6 +65,7 @@
         <div id="projectList" class="template-list"></div>
         <div class="row-gap">
           <button class="btn btn-sm" id="btnImportProject">📂 Импорт проекта (.json)</button>
+          <button class="btn btn-sm" id="btnExportProject">💾 Экспорт текущего (.json)</button>
           <input type="file" id="fileImportProject" accept=".json" hidden>
         </div>
       </div>
@@ -75,13 +77,20 @@
     </div>
   </section>
 
-  <!-- ============ СХЕТА ============ -->
   <section class="page" id="page-scheme">
     <div class="split">
       <div class="split-left">
         <div class="card">
           <div class="card-head">
             <h2>Объекты схемы <span class="muted" id="schemeProjectName"></span></h2>
+            <div class="btn-group" id="calcScopeBar" title="Режим расчёта">
+              <label class="muted" style="align-self:center;margin-right:4px">Режим:</label>
+              <select id="selCalcScope" class="btn btn-sm" style="max-width:220px">
+                <option value="all">вся цепочка 10→0,4</option>
+                <option value="hv">только 6–35 кВ</option>
+                <option value="lv">только 0,4 кВ</option>
+              </select>
+            </div>
             <div class="btn-group">
               <button class="btn btn-sm" id="btnAddGSP">+ ГСП / ЦП</button>
               <button class="btn btn-sm" id="btnAddTRS">+ ТР / ТП</button>
@@ -116,7 +125,6 @@
     </div>
   </section>
 
-  <!-- ============ БЫСТРЫЙ РАСЧЁТ ============ -->
   <section class="page" id="page-quick">
     <div class="split">
       <div class="split-left">
@@ -161,7 +169,6 @@
     </div>
   </section>
 
-  <!-- ============ КАТАЛОГ ============ -->
   <section class="page" id="page-catalog">
     <div class="card">
       <div class="card-head">
@@ -180,7 +187,6 @@
     </div>
   </section>
 
-  <!-- ============ ПОТЕРИ НАПРЯЖЕНИЯ ============ -->
   <section class="page" id="page-udrop">
     <div class="grid2">
       <div class="card">
@@ -205,7 +211,6 @@
     </div>
   </section>
 
-  <!-- ============ ПОТЕРИ ЭНЕРГИИ (НТД) ============ -->
   <section class="page" id="page-lossesTab">
     <div class="card">
       <h2>Техническое электропотребление по «Методическим рекомендациям по определению потерь
@@ -228,7 +233,6 @@
     </div>
   </section>
 
-  <!-- ============ ОТЧЁТ ============ -->
   <section class="page" id="page-report">
     <div class="card">
       <h2>Формирование отчёта</h2>
@@ -247,7 +251,6 @@
     </div>
   </section>
 
-  <!-- ============ НТД ============ -->
   <section class="page" id="page-ntd">
     <div class="card">
       <div class="card-head"><h2>Нормативные таблицы и коэффициенты</h2>
@@ -257,17 +260,15 @@
     <div id="ntdSections"></div>
   </section>
 
-  <!-- ============ ИНСТРУКЦИЯ ============ -->
   <section class="page" id="page-help"><div id="helpContent"></div></section>
 
-  <!-- ============ ТЕСТЫ ============ -->
   <section class="page" id="page-tests">
     <div class="card">
       <div class="card-head"><h2>Встроенная проверка расчётного ядра</h2>
         <button class="btn btn-primary btn-sm" id="btnRunTests">▶ Запустить тесты</button></div>
-      <p class="muted">Контрольные примеры: коэффициенты Ямал СПГ (табл. 3), формула падения
-      напряжения, адиабатное уравнение, проверка ПУЭ 3.1.11, тесты выбора сечения по ДДТ/ΔU,
-      сверка с примером ведомости Методики потерь.</p>
+      <p class="muted">Контрольные примеры: коэффициенты kAT (табл. 3 IEC), формула падения
+      напряжения, адиабатное уравнение, проверка ПУЭ 3.1.11, автовыбор NED/IEC, невозгораемость,
+      ручной override сечения, сверка с примером ведомости Методики потерь.</p>
       <div class="table-wrap"><table class="tbl" id="testsTable"></table></div>
       <div id="testsSummary"></div>
     </div>
@@ -278,11 +279,13 @@
 <div class="toast-wrap" id="toasts"></div>
 
 <script src="assets/data.js"></script>
+<script src="assets/data-compat.js"></script>
 <script src="assets/engine.js"></script>
 <script src="assets/ui.js"></script>
 <script src="assets/ui5.js"></script>
 <script src="assets/help.js"></script>
 <script src="assets/ui2.js"></script>
+<script src="assets/ui-patch.js"></script>
 <script src="assets/ui3.js"></script>
 <script src="assets/ui4.js"></script>
 <script src="assets/tests.js"></script>

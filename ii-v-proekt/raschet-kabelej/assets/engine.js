@@ -1,6 +1,6 @@
 /* =====================================================================
    ENGINE — расчётное ядро (без DOM).  Все формулы — в комментариях
-   с указанием источника (Ямал СПГ / ПУЭ / IEC / Методичка Роскоммунэнерго).
+   с указанием источника (проектная методика 3300-E / ПУЭ / IEC / Методичка Роскоммунэнерго).
    ===================================================================== */
 (function(root){
 const D = (typeof DATA==="undefined" && typeof require!=="undefined") ? require("./data.js") : root.DATA;
@@ -20,7 +20,7 @@ function rAt(s, mat, theta){
 function xLv(s){ let best=D.x0lv[0]; for(const p of D.x0lv){ if(s>=p[0]-1e-9) best=p; } return best[1]; }
 
 /* ---------- поправочные коэффициенты ---------- */
-/* Температура: Ямал СПГ формула (1) k=√((K−T)/(K−t)); K — допуст. θ жилы */
+/* Температура: проектная методика формула (1) k=√((K−T)/(K−t)); K — допуст. θ жилы */
 function kTemp(theta, tFactor, tBase, mode){
   if(mode==="pue"){ const row=pueTempRow(theta,tBase); if(row) return pueInterp(row.v,tFactor); }
   if(theta-tFactor<=0) return 0.30;
@@ -55,18 +55,18 @@ function kTrench(n,gap){
   const base=vec[clamp(Math.round(n),1,6)-1];
   return n>6? base*Math.max(0.7,1-0.045*(n-6)) : base;
 }
-/* Группировка в воздухе: каталог NED/Ямал */
+/* Группировка в воздухе: каталог NED/проектная методика */
 function kAirGroup(mode,N,setIdx){
-  if(mode==="yamal"){ const m={single:1.00,tight:0.64,hv:0.90,hvSpaced:0.93}; return m[setIdx]!=null?m[setIdx]:1; }
+  if(mode==="iec"||mode==="yamal"){ const m={single:1.00,tight:0.64,hv:0.90,hvSpaced:0.93}; return m[setIdx]!=null?m[setIdx]:1; }
   const tbl = mode==="channel"?D.kGroupChannelCatalog : mode==="tray"?D.kTrayCatalog : D.kGroupAirCatalog;
   const set = tbl.sets[setIdx||0]||tbl.sets[0];
   const idx = N<=1?0:N===2?1:N===3?2:N===4?3:N<=6?4:5;
   return set.v[idx];
 }
-/* Группировка LV-лоток по Ямал (B52.20/21): по числу цепей */
-function kAirYamalLadder(nCircuits){
+/* Группировка LV-лоток по проектной методики (B52.20/21): по числу цепей */
+function kAirIecLadder(nCircuits){
   if(nCircuits<=3) return {s:0.80,d:"≈0,80"};
-  return {s:0.64,d:">9 многож. / >3 однож. (Ямал §7.7)"};
+  return {s:0.64,d:">9 многож. / >3 однож. (метод. §7.7)"};
 }
 
 /* ---------- расчётный ток ---------- */
@@ -79,7 +79,7 @@ function current(P_kw, cosphi, U_kv, ph, Ks){
 function S_from(P,Q){ return {S:Math.sqrt(P*P+Q*Q), cosphi: Q!==0? P/Math.sqrt(P*P+Q*Q):1}; }
 
 /* ---------- падение напряжения ---------- */
-/* Ямал §7.9 (IEC 60364): ΔU = √3·I·L·(r·cosφ+x·sinφ)/1000 [В] (3ф);
+/* метод. §7.9 (IEC 60364): ΔU = √3·I·L·(r·cosφ+x·sinφ)/1000 [В] (3ф);
    ΔU% = 100·ΔU/Uн ; 1ф (2/3-пров.): ΔU=2·I·L·(...)/1000 относительно Uф */
 function voltDrop(I, L_m, r_km, x_km, cosphi, U_kv, ph, withNeutral){
   const U=U_kv*1000, sinphi=withNeutral?Math.max(cosphi,(1-cosphi)) : Math.sqrt(Math.max(0,1-cosphi*cosphi));
@@ -90,7 +90,7 @@ function voltDrop(I, L_m, r_km, x_km, cosphi, U_kv, ph, withNeutral){
   return {V:dU,pct:pct,sinphi:sinphi};
 }
 
-/* ---------- термическая стойкость (Ямал §7.10) ---------- */
+/* ---------- термическая стойкость (метод. §7.10) ---------- */
 /* A ≥ I·√t / K ;  I — ток КЗ А, t — с, K=143 (Cu XLPE/EPR) */
 function sMinSC(Ik_kA, t_s, K){ return t_s<=0?0:Ik_kA*1000*Math.sqrt(t_s)/K; }
 
@@ -99,10 +99,20 @@ function sourceSeries(key, line){
   /* Возвращает [{s, I, theta, tBase, note, r90? , kind}] для режима прокладки */
   const ph=line.ph||"3", cores=line.cores||(ph==="1"?2:3);
   const meth=line.method||"earth_trench", grp=Object.assign({label:meth},D.methods[meth]||{});
-  const src = line.src|| key || "auto";
+  let src = line.src|| key || "auto";
+  if(src==="YAMAL-LV") src="IEC-LV";
+  if(src==="YAMAL-HV") src="IEC-HV";
+  /* auto: ВН → каталог SN; НН в воздухе → IEC-LV; НН в земле → ГТП ПУЭ */
+  if(src==="auto"||src==null||src===""){
+    const vc=String(line.vclass||"0.4");
+    const isHV = vc!=="0.4" && vc!=="0.66" && Number(vc)>=6;
+    if(isHV) src = (line.cores===1||(line.src&&String(line.src).includes("1x")))?"SN1x":"SN3x";
+    else if(line.method&&line.method.startsWith("air")&&(line.mat||"cu")==="cu") src="IEC-LV";
+    else src="GTP-PUYE";
+  }
   /* --- NED SN 6–35 кВ --- */
   if(src.startsWith("SN")){
-    const U=line.vclass==="6"?"3.6/6":line.vclass==="35"?"20.3/35":"6/10";
+    const U=line.vclass==="6"?"3.6/6":line.vclass==="20"?"12/20":line.vclass==="35"?"20.3/35":"6/10";
     const is1 = src.includes("1x");
     const list = is1? D.sn1[U] : D.sn3[U];
     return list.map(r=>{
@@ -115,17 +125,17 @@ function sourceSeries(key, line){
       return {s:r.s,I:I,theta:90,tBase:meth==="earth_trench"?15:30,note:note,r90:r90,diam:r.d};
     });
   }
-  /* --- Ямал LV (в воздухе по табл.1) --- */
-  if(src==="YAMAL-LV"){
+  /* --- IEC LV (в воздухе по табл.1) --- */
+  if(src==="IEC-LV"){
     const conduit = line.method==="air_pipe";
-    return D.lvYamal.map(r=>({s:r[0],I:conduit?r[2]:r[1],theta:90,tBase:30,
-      note:"Ямал СПГ, табл.1 (IEC 60364-5-52) "+(conduit?"в трубе B2":"лоток E/F")+", медь 3/4-ж. XLPE-типа 90°С"}));
+    return D.lvIec.map(r=>({s:r[0],I:conduit?r[2]:r[1],theta:90,tBase:30,
+      note:"проектная методика, табл.1 (IEC 60364-5-52) "+(conduit?"в трубе B2":"лоток E/F")+", медь 3/4-ж. XLPE-типа 90°С"}));
   }
-  if(src==="YAMAL-HV"){
-    return D.hvYamalAir.c3.map(r=>({s:r.s,I:r.i,theta:90,tBase:30,note:"Ямал СПГ, табл.2 (IEC 60502-2), 3x брон. в воздухе"}));
+  if(src==="IEC-HV"){
+    return D.hvIecAir.c3.map(r=>({s:r.s,I:r.i,theta:90,tBase:30,note:"проектная методика, табл.2 (IEC 60502-2), 3x брон. в воздухе"}));
   }
   /* --- ПУЭ ГТП пластмасса 0,66-1кВ (в т.ч. в земле) --- */
-  if(src==="GTP-PUYE"||src==="auto"||src==null||src===""){
+  if(src==="GTP-PUYE"){
     const mat=line.mat||"cu";
     const T=(mat==="al"?D.lvGostPlastic.al:D.lvGostPlastic.cu);
     const arr = cores===1? T.c1 : cores===2? T.c2 : T.c3;
@@ -172,7 +182,7 @@ function selectLine(line, set){
     if(r.I==null||isNaN(r.I)) continue;
     if(line.minS && r.s<line.minS) continue;
     if(line.maxS && r.s>line.maxS) continue;
-    /* нормировка каталожного тока на θJob (Ямал ф-ла (1)) + среды: */
+    /* нормировка каталожного тока на θJob (формула (1)) + среды: */
     const ground = line.method&&line.method.startsWith("earth");
     const tFact = ground? (line.Tsoil!=null?line.Tsoil:(S.Tsoil!=null?S.Tsoil:15)) : (line.Tair!=null?line.Tair:(S.Tair!=null?S.Tair:30));
     let kg=1, kgh=null;
@@ -181,12 +191,12 @@ function selectLine(line, set){
       if(line.grpCatalog) kg*=1;
       kgh="ПУЭ 1.3.26 ×1.3.23";
     } else {
-      const m=line.groupMode|| (line.grpMode||"yamal");
+      const m=line.groupMode|| (line.grpMode||"iec");
       kg = kAirGroup(m, line.nParallel||1, line.grpSet!=null?line.grpSet:"single");
-      kgh=({single:"Ямал kGA 1,00",tight:"Ямал kGA 0,64",hv:"Ямал kGA 0,90",hvSpaced:"Ямал kGA 0,93"})[line.grpSet]||"по каталогу/Ямал";
+      kgh=({single:"kGA (IEC) 1,00",tight:"kGA (IEC) 0,64",hv:"kGA (IEC) 0,90",hvSpaced:"kGA (IEC) 0,93"})[line.grpSet]||"по каталогу/IEC";
     }
     /* составной темп-коэффициент от базы каталога (θcat,tBase) к рабочей (θJob,tFact),
-       по формуле (1) Ямал СПГ k=√((K−T)/(K−t)) (или по табл.1.3.3 ПУЭ в режиме pue) */
+       по формуле (1) проектная методика k=√((K−T)/(K−t)) (или по табл.1.3.3 ПУЭ в режиме pue) */
     let kTotal;
     if((line.kTempMode||S.kTempMode)==="pue" && thetaJob===r.theta){ kTotal=kTemp(thetaJob,tFact,r.tBase,"pue"); }
     else { kTotal = (thetaJob-tFact>0 && r.theta-r.tBase>0)? Math.sqrt((thetaJob-tFact)/(r.theta-r.tBase)) : 0.30; }
@@ -231,13 +241,44 @@ function selectLine(line, set){
       const cosP=line.motor.cosP||0.5;
       const duS=voltDrop(line.motor.Ip, line.L||0, rOhmKm, x, cosP, Uvol, ph, false);
       const limS=line.motor.lim||15;
-      cand.checks.start={ok:duS.pct<=limS?1:0,txt:`пуск: ΔU=${f1(duS.pct)}% ≤ ${limS}% (Ямал §7.9)`};
+      cand.checks.start={ok:duS.pct<=limS?1:0,txt:`пуск: ΔU=${f1(duS.pct)}% ≤ ${limS}% (метод. §7.9 / IEC)`};
       cand.pass=cand.pass&&!!cand.checks.start.ok;
+    }
+    /* невозгораемость / исполнение нг (ГОСТ 31565) */
+    if(line.requireFire || S.requireFire){
+      const brand = line.brand || line.brandOverride || "";
+      const fireOk = isFireSafeBrand(brand, line.fireClass||S.fireClass||"ng");
+      cand.checks.fire={ok:fireOk?1:0, txt: fireOk
+        ? (`исполнение «${brand||"нг"}» соответствует требованию невозгораемости (ГОСТ 31565)`)
+        : (`требуется марка нг / нг(А)-LS / HF (ГОСТ 31565); задано: «${brand||"—"}»`)};
+      cand.pass=cand.pass&&!!cand.checks.fire.ok;
     }
     if(!best && cand.pass) best=cand;
     cands.push(cand);
   }
+  /* ручной override сечения: принудительно принимаем выбранное s, проверки сохраняются */
+  if(line.manualS!=null && line.manualS!=="" && !isNaN(+line.manualS)){
+    const ms=+line.manualS;
+    let forced=cands.find(c=>c.s===ms);
+    if(!forced && cands.length){
+      forced=Object.assign({}, cands[cands.length-1], {s:ms, pass:false, checks:Object.assign({}, (cands[cands.length-1].checks||{}), {
+        manual:{ok:0,txt:`сечение ${ms} мм² вне ряда источника — проверьте вручную`}
+      })});
+      cands.push(forced);
+    }
+    if(forced){ forced.manual=true; best=forced; }
+  }
   return {cands, best, IrA, Kneed, kAdd:Kadd, thetaJob};
+}
+function isFireSafeBrand(brand, need){
+  const b=String(brand||"").toLowerCase().replace(/ё/g,"е");
+  if(!need || need==="none" || need==="off") return true;
+  if(!b) return false; /* требование есть, марка не задана */
+  const ng = /нг/.test(b) || /\bfr\b/.test(b) || /frls|frhf|hf\b|lszh|лszh/.test(b);
+  if(need==="ng" || need==="any") return ng;
+  if(need==="ls") return ng && (/ls|нг\(а\)-ls|нг\(а\)ls|frls/.test(b));
+  if(need==="hf") return ng && (/hf|frhf|lszh/.test(b));
+  return ng;
 }
 function xFor(line,r){ /* реактивное сопротивление для линии */
   if(line.kind==="vl") return r.x0 || (line.vclass==="0.4"?0.35:0.40);
@@ -247,8 +288,8 @@ function xFor(line,r){ /* реактивное сопротивление для
   return xLv(r.s);
 }
 function KsOf(line){ return line.Ks!=null?line.Ks:1; }
-function motorK(line,S){ return (line.motor&&line.motor.branch)?1.25:1; } /* ПУЭ 3.1.12/7.3.97, Ямал §7.2 */
-function multiK(line,S){ /* Ямал §7.8: >2 проводника на фазу → ДДТ×0,85, т.е. требуемый ток /0,85 */
+function motorK(line,S){ return (line.motor&&line.motor.branch)?1.25:1; } /* ПУЭ 3.1.12/7.3.97, метод. §7.2 */
+function multiK(line,S){ /* метод. §7.8: >2 проводника на фазу → ДДТ×0,85, т.е. требуемый ток /0,85 */
   return (line.nPerPhase&&line.nPerPhase>2)?1/0.85:1; }
 
 /* ---------- потери электроэнергии по Методике (Роскоммунэнерго 2001) ---------- */
@@ -277,8 +318,8 @@ function chainDrops(pathLines){ /* pathLines: [{pct,V}] */
   return pathLines.reduce((a,l)=>({pct:a.pct+l.pct,V:a.V+l.V}),{pct:0,V:0});
 }
 
-const Eng = {rAt,xLv,kTemp,kRho,kTrench,kAirGroup,kAirYamalLadder,current,S_from,voltDrop,
+const Eng = {rAt,xLv,kTemp,kRho,kTrench,kAirGroup,kAirIecLadder,current,S_from,voltDrop,
   sMinSC,sourceSeries,selectLine,tauHours,lossesLine,lossesTransformer,kDop,chainDrops,
-  motorK,multiK,xFor,KsOf,f1,f2,f3,f0};
+  motorK,multiK,xFor,KsOf,isFireSafeBrand,f1,f2,f3,f0};
 root.Eng = Eng;
 })(typeof window!=="undefined"?window:globalThis);
