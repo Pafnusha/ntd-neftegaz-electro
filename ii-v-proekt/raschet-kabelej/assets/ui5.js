@@ -3,7 +3,7 @@ Object.assign(App,{
   bindNTD(){ const self=this; const host=self.$("#ntdSections"); if(!host)return; host.innerHTML=""; const nav=self.$("#ntdNav"); nav.innerHTML="";
     const mk=(id,title,fill)=>{ const c=self.el("div",{class:"card ntd-sec",id:"ntd-"+id}); c.dataset.key=title.toLowerCase();
       c.append(self.el("h2",{},[title])); if(fill)fill(c); host.append(c);
-      nav.append(self.el("div",{class:"chip",onclick:()=>{const e=document.getElementById("ntd-"+id);if(e)e.scrollIntoView({behavior:"smooth");}},[id.toUpperCase()])); };
+      nav.append(self.el("div",{class:"chip",onclick:()=>{const e=document.getElementById("ntd-"+id);if(e)e.scrollIntoView({behavior:"smooth"});}},[id.toUpperCase()])); };
     const TB=rows=>{ let h="<div class='table-wrap'><table class='tbl'>"+rows.join("")+"</table></div>"; return h; };
 
     mk("iec1","IEC 60364-5-52 · Таблица 1 (проектная методика) — длительно допустимые токи НН, 0,66/1 кВ, медь XLPE/аналог (90 °С; t возд 30 °С; IEC 60364-5-52)",c=>{
