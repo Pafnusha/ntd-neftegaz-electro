@@ -46,6 +46,10 @@ main { padding: 22px 0 60px; }
 .hero p { color: var(--muted); max-width: 820px; line-height: 1.55; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; margin-top: 16px; }
 .note { color: var(--muted); font-size: 13px; line-height: 1.5; }
+a.doclink { color: var(--accent2); font-weight: 700; text-decoration: none; border-bottom: 1px dashed rgba(46,196,182,.45); white-space: nowrap; }
+a.doclink:hover, a.doclink:focus-visible { color: var(--accent); border-bottom-color: var(--accent); outline: none; }
+a.doclink b { color: inherit; font-weight: 700; }
+.doclink-ext { font-size: .8em; margin-left: 3px; opacity: .8; }
 input, select { background: #0f1822; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { border-bottom: 1px solid var(--line); padding: 8px; text-align: left; vertical-align: top; }
