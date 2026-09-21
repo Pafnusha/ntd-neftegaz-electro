@@ -1,0 +1,95 @@
+/* ============================================================
+   ИИ·ПРОЕКТ — configurator: форма опросника + «бумага» вывода
+   ============================================================ */
+.sec-config{max-width:none; padding-left:0; padding-right:0}
+.sec-config > .kicker,.sec-config > .sec-lede,.sec-config > h2{
+  max-width:var(--maxw); margin-inline:auto; padding-inline:clamp(14px,4vw,34px)
+}
+.cfg{
+  max-width:var(--maxw); margin:26px auto 0; padding:0 clamp(14px,4vw,34px);
+  display:grid; grid-template-columns:minmax(320px,1fr) minmax(340px,1.25fr); gap:22px; align-items:start
+}
+.cfg-form{display:grid; gap:14px}
+.fld{border:1px solid var(--line-2); background:rgba(255,255,255,.022); padding:14px 16px 16px; border-radius:var(--r)}
+.fld > legend, .fld > .fld-t{
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--acc-y);
+  padding:0; margin-bottom:11px; display:flex; gap:9px; align-items:center
+}
+.fld > legend span,.fld > .fld-t span{color:var(--muted); letter-spacing:.04em; text-transform:none; font-size:10px}
+.fld fieldset{border:0; margin:0; padding:0}
+.opts{display:flex; flex-wrap:wrap; gap:6px}
+.opt{
+  display:inline-flex; align-items:center; gap:7px; border:1px solid var(--line-2); padding:8px 11px; cursor:pointer;
+  font-size:12.5px; color:#cddceb; transition:.16s; background:transparent; border-radius:2px; user-select:none
+}
+.opt:hover{border-color:var(--acc-y)}
+.opt input{position:absolute; opacity:0; pointer-events:none}
+.opt .bx{
+  width:13px; height:13px; border:1px solid var(--line-2); display:grid; place-items:center; font-size:9px;
+  color:var(--bg); background:transparent; transition:.16s; flex:0 0 auto
+}
+.opt.on{border-color:var(--acc); background:rgba(242,87,42,.12); color:#fff}
+.opt.on .bx{background:var(--acc); border-color:var(--acc)}
+.opt.on .bx::after{content:"×"; color:#fff; font-family:var(--mono)}
+.opt.radio .bx{border-radius:50%}
+.opt.radio.on .bx{background:var(--acc-y); border-color:var(--acc-y)}
+.opt.radio.on .bx::after{content:""; width:5px; height:5px; background:var(--bg); border-radius:50%}
+.hint{font-size:.8em; color:var(--muted); margin-top:9px; font-family:var(--mono); letter-spacing:.02em}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+input[type=range]{width:100%; accent-color:var(--acc)}
+.val{font-family:var(--dsp); font-weight:700; color:var(--acc-y); font-size:16px}
+
+/* ---------- output "paper" ---------- */
+.cfg-out{
+  border:1px solid var(--line-2); background:var(--panel); padding:10px; position:sticky; top:78px; max-height:calc(100vh - 100px); overflow:auto
+}
+.paper{
+  background:var(--paper); color:var(--ink); padding:clamp(18px,2.4vw,30px); font-family:var(--body);
+  box-shadow:0 30px 70px -34px rgba(0,0,0,.9); position:relative
+}
+.paper::before{
+  content:""; position:absolute; inset:8px; border:1px solid rgba(10,26,43,.22); pointer-events:none
+}
+.paper h3{font-family:var(--dsp); text-transform:uppercase; font-size:22px; margin:0 0 4px; color:#07131f}
+.paper .p-tag{
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.2em; text-transform:uppercase; color:#8a3a1b;
+  border:1px solid #8a3a1b; display:inline-block; padding:3px 7px; margin-bottom:12px
+}
+.paper .p-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px; background:rgba(10,26,43,.2);
+  border:1px solid rgba(10,26,43,.2); margin:14px 0}
+.paper .p-grid div{background:var(--paper); padding:9px 11px}
+.paper .p-grid b{display:block; font-family:var(--mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#6b5327; margin-bottom:3px; font-weight:400}
+.paper .p-grid span{font-size:.86em; font-weight:600; color:#0d2033}
+.paper h4{
+  font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:#8a3a1b;
+  margin:18px 0 7px; display:flex; align-items:center; gap:9px
+}
+.paper h4::after{content:""; flex:1; height:1px; background:rgba(10,26,43,.22)}
+.paper ol,.paper ul{margin:0; padding-left:20px; display:grid; gap:6px}
+.paper li{font-size:.9em; color:#16283a}
+.paper li b{color:#07131f}
+.paper .kv{display:grid; grid-template-columns:1fr auto; gap:4px 12px; font-size:.88em; border-top:1px dashed rgba(10,26,43,.3); padding-top:8px; margin-top:8px}
+.paper .kv span{color:#3d5266}
+.paper .kv b{font-family:var(--mono); color:#07131f; font-weight:700}
+.paper .warn{background:rgba(138,58,27,.09); border-left:3px solid #8a3a1b; padding:9px 12px; font-size:.85em; margin-top:10px; color:#2b1c14}
+.paper .ok{color:#2c5b3f; font-weight:700}
+.paper .sign{
+  margin-top:20px; border-top:2px solid rgba(10,26,43,.4); padding-top:12px; display:flex; justify-content:space-between;
+  gap:14px; flex-wrap:wrap; font-family:var(--mono); font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:#5e4a22
+}
+.cfg-actions{grid-column:1/-1; display:flex; flex-wrap:wrap; gap:10px; margin-top:4px}
+.cfg-empty{border:1px dashed var(--line-2); padding:36px 22px; text-align:center; color:var(--muted); font-family:var(--mono); font-size:12.5px; letter-spacing:.05em}
+
+/* ---------- toast ---------- */
+.toast{
+  position:fixed; left:50%; bottom:26px; transform:translate(-50%,24px); opacity:0; z-index:80;
+  background:var(--panel); border:1px solid var(--acc); color:#fff; padding:12px 20px;
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; transition:.3s;
+  box-shadow:var(--shadow); border-radius:2px
+}
+.toast.show{opacity:1; transform:translate(-50%,0)}
+
+@media (max-width:1000px){
+  .cfg{grid-template-columns:1fr}
+  .cfg-out{position:static; max-height:none}
+}

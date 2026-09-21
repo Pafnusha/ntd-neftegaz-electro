@@ -1,0 +1,160 @@
+/* ============================================================
+   ИИ·ПРОЕКТ — layout: сетки, шапка, мастер, секции, футер
+   ============================================================ */
+
+/* ---------- sticky topbar ---------- */
+.topbar{
+  position:sticky; top:0; z-index:50;
+  display:flex; align-items:center; gap:18px;
+  padding:10px clamp(14px,3vw,34px);
+  background:rgba(6,23,41,.86);
+  backdrop-filter:blur(9px) saturate(1.2);
+  border-bottom:1px solid var(--line-2);
+}
+.brand{display:flex; flex-direction:column; line-height:1.05; border:0}
+.brand-mark{font-family:var(--dsp); font-weight:700; font-size:18px; letter-spacing:.06em; color:#fff; text-transform:uppercase}
+.brand-mark b{color:var(--acc)}
+.brand-sub{font-family:var(--mono); font-size:9.5px; letter-spacing:.16em; color:var(--muted); text-transform:uppercase}
+.topnav{display:flex; gap:2px; margin-left:auto; flex-wrap:wrap}
+.topnav a{
+  font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--muted); border:0; padding:8px 11px; border-radius:2px; position:relative; white-space:nowrap
+}
+.topnav a:hover{color:#fff; background:rgba(255,255,255,.06)}
+.topnav a.on{color:#fff}
+.topnav a.on::after{content:""; position:absolute; left:11px; right:11px; bottom:2px; height:2px; background:var(--acc)}
+.menu-btn{display:none; background:none; border:1px solid var(--line-2); color:#fff; font-size:18px; border-radius:2px; padding:4px 10px; cursor:pointer}
+.topbar-act{display:flex; gap:8px}
+
+/* ---------- section shell ---------- */
+.sec{
+  max-width:var(--maxw); margin:0 auto; padding:clamp(46px,7vw,96px) clamp(14px,4vw,34px);
+  position:relative;
+}
+.sec + .sec{border-top:1px solid var(--line)}
+
+/* ---------- masthead ---------- */
+.mast{
+  max-width:var(--maxw); margin:0 auto; padding:clamp(48px,8vw,110px) clamp(14px,4vw,34px) clamp(30px,5vw,60px);
+  position:relative;
+}
+.mast-stamp{
+  position:absolute; top:clamp(18px,4vw,48px); right:clamp(14px,4vw,34px);
+  display:grid; gap:2px; text-align:right; border:1px solid var(--line-2); padding:9px 12px;
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.16em; color:var(--muted); text-transform:uppercase;
+  transform:rotate(-1.2deg)
+}
+.mast-stamp span:first-child{color:var(--acc); letter-spacing:.28em}
+.mast-title{display:grid; margin:6px 0 26px}
+.mast-title .line{position:relative; padding-left:0}
+.mast-title .line:nth-child(2){color:#fff}
+.mast-title .accent{color:var(--acc)}
+.mast-title .line:last-child::after{
+  content:""; position:absolute; right:0; bottom:.12em; height:2px; width:min(46%,320px);
+  background:linear-gradient(90deg,var(--acc),transparent)
+}
+.mast-lede{max-width:78ch; font-size:clamp(16px,1.15vw,19px); color:#cfdcea}
+.mast-meta{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:1px;
+  background:var(--line-2); border:1px solid var(--line-2); margin:30px 0 26px
+}
+.mast-meta > div{background:var(--bg); padding:14px 16px}
+.mast-meta b{display:block; font-family:var(--mono); font-size:10px; letter-spacing:.16em; color:var(--acc-y); text-transform:uppercase; margin-bottom:6px}
+.mast-meta span{font-size:.9em; color:#b9cadb}
+.mast-jump{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; margin-top:6px}
+.jump{
+  display:flex; align-items:center; gap:10px; border:1px solid var(--line-2); padding:14px 16px;
+  color:#fff; font-family:var(--dsp); font-weight:500; font-size:16px; text-transform:uppercase; letter-spacing:.03em;
+  background:linear-gradient(180deg,rgba(255,255,255,.04),transparent); transition:.22s; border-radius:var(--r)
+}
+.jump b{font-family:var(--mono); color:var(--acc); font-size:12px; letter-spacing:.08em}
+.jump span{margin-left:auto; font-family:var(--mono); color:var(--acc); transition:.22s}
+.jump:hover{border-color:var(--acc); transform:translateY(-3px); color:#fff; box-shadow:var(--shadow)}
+.jump:hover span{transform:translateX(5px)}
+
+/* ---------- ticker ---------- */
+.ticker{
+  display:flex; gap:1px; overflow-x:auto; border:1px solid var(--line-2); background:var(--line-2);
+  margin:26px 0 8px; scrollbar-width:thin
+}
+.ticker::-webkit-scrollbar{height:6px}
+.ticker::-webkit-scrollbar-thumb{background:var(--line-2)}
+.tk{
+  flex:0 0 auto; min-width:172px; background:var(--bg-2); padding:13px 16px; cursor:pointer; border:0; text-align:left;
+  transition:.2s
+}
+.tk:hover{background:var(--panel)}
+.tk b{display:block; font-family:var(--dsp); font-weight:700; font-size:clamp(21px,2.4vw,31px); color:var(--acc-y); line-height:1}
+.tk span{display:block; font-family:var(--mono); font-size:10.5px; letter-spacing:.05em; color:var(--muted); margin-top:6px; text-transform:uppercase}
+
+/* ---------- evidence grid ---------- */
+.evid-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; margin-top:8px}
+.ev{
+  border:1px solid var(--line-2); padding:20px; position:relative; background:
+   linear-gradient(180deg,rgba(255,255,255,.035),transparent); border-radius:var(--r); overflow:hidden
+}
+.ev::before{
+  content:attr(data-n); position:absolute; right:12px; top:6px; font-family:var(--dsp); font-weight:700;
+  font-size:54px; color:rgba(255,255,255,.05); line-height:1
+}
+.ev-num{font-family:var(--dsp); font-weight:700; font-size:clamp(30px,4vw,46px); color:var(--acc); line-height:1}
+.ev-lab{font-family:var(--mono); font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--acc-y); margin:4px 0 10px}
+.ev p{font-size:.94em; color:#c3d3e2; margin:0}
+.ev-src{font-family:var(--mono); font-size:10px; color:var(--muted); margin-top:12px; border-top:1px dashed var(--line-2); padding-top:8px}
+
+/* ---------- callout ---------- */
+.callout{
+  margin-top:26px; border-left:3px solid var(--acc); padding:18px 22px; background:rgba(242,87,42,.07);
+  border-radius:0 var(--r) var(--r) 0
+}
+.callout-tag{font-family:var(--mono); font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--acc); margin:0 0 8px}
+.callout p:last-child{margin:0; max-width:88ch; color:#dbe7f2}
+
+/* ---------- catalog / risks / forms ---------- */
+.cat,.risks,.forms{display:grid; gap:12px; margin-top:10px}
+.risks{grid-template-columns:repeat(auto-fit,minmax(290px,1fr))}
+.forms{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.src{list-style:none; padding:0; margin:0; display:grid; gap:9px; max-width:96ch}
+.src li{padding-left:20px; position:relative; font-size:.95em; color:#c3d3e2}
+.src li::before{content:"—"; position:absolute; left:0; color:var(--acc); font-family:var(--mono)}
+
+/* ---------- footer ---------- */
+.foot{
+  border-top:1px solid var(--line-2); margin-top:26px; padding:34px clamp(14px,4vw,34px) 46px;
+  max-width:var(--maxw); margin-inline:auto; display:grid; gap:10px
+}
+.foot-stamp{display:flex; gap:14px; flex-wrap:wrap; font-family:var(--mono); font-size:10px; letter-spacing:.2em;
+  text-transform:uppercase; color:var(--acc)}
+.foot p{color:var(--muted); font-size:.88em; max-width:92ch; margin:0}
+.foot-tech{font-family:var(--mono); font-size:11px !important; letter-spacing:.04em}
+
+/* ---------- reveal animation ---------- */
+.rv{opacity:0; transform:translateY(16px); transition:opacity .6s ease, transform .6s cubic-bezier(.2,.8,.2,1)}
+.rv.in{opacity:1; transform:none}
+@media (prefers-reduced-motion:reduce){
+  .rv{opacity:1 !important; transform:none !important}
+  *{transition-duration:.01ms !important; animation-duration:.01ms !important}
+  html{scroll-behavior:auto}
+}
+
+/* ---------- responsive ---------- */
+@media (max-width:980px){
+  .menu-btn{display:block; order:-1}
+  .topnav{
+    position:fixed; inset:56px 0 auto 0; flex-direction:column; gap:0; background:rgba(7,25,44,.98);
+    border-bottom:1px solid var(--line-2); padding:8px 14px 14px; display:none
+  }
+  .topnav.open{display:flex}
+  .topnav a{padding:11px 6px; font-size:12.5px; border-bottom:1px solid var(--line)}
+  .mast-stamp{display:none}
+}
+@media (max-width:620px){
+  .topbar{gap:9px; padding:8px 12px}
+  .brand-sub{display:none}
+  .topbar-act{margin-left:auto; flex:0 1 auto; min-width:0}
+  .topbar-act .btn{padding:9px 10px; font-size:10px; letter-spacing:.05em}
+  .topbar-act .back{max-width:38vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .mast-title{font-size:clamp(31px,10vw,44px)}
+  .ticker{scroll-snap-type:x mandatory}
+  .tk{scroll-snap-align:start; min-width:150px}
+}

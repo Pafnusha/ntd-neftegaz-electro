@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ИИ в проект — пошаговая инструкция (ЭС-Нефтегаз) — пошаговая инструкция внедрения искусственного интеллекта в проектные и изыскательские работы</title>
+<meta name="description" content="Интерактивная инструкция и конфигуратор: как ввести ИИ в проекты и рабочую документацию проектной организации. Основано на материалах VIII конференции «Комплексный инжиниринг в нефтегазодобыче» (АО «Гипровостокнефть», 19–20 августа 2026).">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Golos+Text:wght@400;500;600;700;800&family=PT+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/configurator.css">
+<link rel="stylesheet" href="css/print.css" media="print">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23071B2F'/%3E%3Cpath d='M5 5h22v22H5z' fill='none' stroke='%23F25C2B' stroke-width='2'/%3E%3Cpath d='M11 22V10l10 12V10' fill='none' stroke='%23F5E39B' stroke-width='2.4'/%3E%3C/svg%3E">
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="topbar">
+  <button class="menu-btn" id="menuBtn" aria-label="Меню">≡</button>
+  <a class="brand" href="#top">
+    <span class="brand-mark">ИИ<b>·</b>ПРОЕКТ</span>
+    <span class="brand-sub">регламент внедрения · ред. 1.0</span>
+  </a>
+  <nav class="topnav" id="topnav">
+    <a href="#s-why">Доказательства</a>
+    <a href="#s-steps">7 шагов</a>
+    <a href="#s-matrix">Матрица</a>
+    <a href="#s-config">Конфигуратор</a>
+    <a href="#s-evidence">Материалы</a>
+    <a href="#s-risks">Риски</a>
+    <a href="#s-forms">Формы</a>
+  </nav>
+  <div class="topbar-act">
+    <a class="btn btn-ghost back" href="../index.html" title="К модулям ЭС-Нефтегаз">← ЭС-Нефтегаз</a>
+    <button class="btn btn-ghost" id="printBtn">Печать / PDF</button>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ============ 00 МАСТHEAD ============ -->
+<section class="mast" id="s-mast">
+  <div class="mast-stamp" aria-hidden="true">
+    <span>УТВЕРЖДАЮ</span><span>внедрение ИИ</span><span>ред. 1.0 · 2026</span>
+  </div>
+  <p class="kicker">00 / назначение документа</p>
+  <h1 class="mast-title">
+    <span class="line">ИИ в проект:</span>
+    <span class="line">семь шагов</span>
+    <span class="line accent">от рутины</span>
+    <span class="line accent">к регламенту</span>
+  </h1>
+  <p class="mast-lede">
+    Практическая инструкция и конфигуратор для проектной организации: как ввести искусственный
+    интеллект в проекты и рабочую документацию — с артефактами, метриками, границами ответственности
+    и требованиями информационной безопасности. Не «чат-бот ради чат-бота», а производственный
+    сценарий с паспортом, проверкой и доказательством результата.
+  </p>
+  <div class="mast-meta">
+    <div><b>Источник данных</b><span>83 комплекта материалов VIII конференции «Комплексный инжиниринг
+      в нефтегазодобыче», АО&nbsp;«Гипровостокнефть», Самара, 19–20 августа 2026</span></div>
+    <div><b>Кому</b><span>ОАПП,главным инженерам, руководителям отделов, ИТ и главным специалистам</span></div>
+    <div><b>Принцип</b><span>Human-in-the-loop: ИИ снимает рутину — решение и подпись остаются за инженером</span></div>
+  </div>
+  <div class="ticker" id="ticker" aria-label="Ключевые показатели"></div>
+  <div class="mast-jump">
+    <a class="jump" href="#s-config"><b>01</b> Собрать план внедрения<span>→</span></a>
+    <a class="jump" href="#s-steps"><b>02</b> Пройти 7 шагов<span>→</span></a>
+    <a class="jump" href="#s-matrix"><b>03</b> Выбрать сценарии<span>→</span></a>
+  </div>
+</section>
+
+<!-- ============ 01 ДОКАЗАТЕЛЬСТВА ============ -->
+<section class="sec" id="s-why">
+  <p class="kicker">01 / доказательная база</p>
+  <h2>Почему это уже не эксперимент</h2>
+  <div class="evid-grid" id="evidGrid"></div>
+  <div class="callout">
+    <p class="callout-tag">Вывод из материалов</p>
+    <p>Во всех зрелых кейсах конференции эффект дают не модели, а <b>три вещи</b>: подготовленные данные,
+   закрытый контур (локальные LLM на своих данных) и короткая петля «прототип → пилот → внедрение»
+    с назначенным ответственным в каждом подразделении. Именно эта связка у Гипровостокнефти дала
+    80&nbsp;% вовлечённых сотрудников и ускорение типовых операций в 5–20 раз.</p>
+  </div>
+</section>
+
+<!-- ============ 02 СЕМЬ ШАГОВ ============ -->
+<section class="sec" id="s-steps">
+  <p class="kicker">02 / пошаговая инструкция</p>
+  <h2>Семь шагов внедрения</h2>
+  <p class="sec-lede">Двигайтесь по порядку: каждый шаг имеет цель, исполнителя, артефакт и критерий выхода.
+    Шаг нельзя «перескочить» — иначе следующий упирается в отсутствие данных или в запрет ИБ.</p>
+  <div class="stepper" id="stepNav"></div>
+  <article class="step-body" id="stepBody"></article>
+</section>
+
+<!-- ============ 03 МАТРИЦА СЦЕНАРИЕВ ============ -->
+<section class="sec" id="s-matrix">
+  <p class="kicker">03 / что брать первым</p>
+  <h2>Матрица ИИ-сценариев в ПИР</h2>
+  <p class="sec-lede">Сценарии отсортированы по произведению «реализуемость × эффект» — той же логике
+    следовало картирование ≈50 сценариев в ООО «Газпромнефть-Развитие». Кликните по строке — сценарий
+    попадёт в конфигуратор.</p>
+  <div class="matrix-controls">
+    <div class="mc-group" id="procFilter"></div>
+    <label class="mc-sort">Сортировка
+      <select id="matSort">
+        <option value="pri">по приоритету</option>
+        <option value="eff">по эффекту</option>
+        <option value="impl">по реализуемости</option>
+        <option value="proc">по процессу</option>
+      </select>
+    </label>
+    <label class="mc-search">Поиск <input id="matSearch" type="search" placeholder="например: коллизии"></label>
+  </div>
+  <div class="matrix" id="matrix"></div>
+  <div class="matrix-legend">
+    <span><b>◼</b> баллы 1–10</span><span><b>Э</b> эффект</span><span><b>Р</b> реализуемость</span>
+    <span><b>≈</b> ожидаемый срок</span><span><b>№</b> источник в материалах конференции</span>
+  </div>
+</section>
+
+<!-- ============ 04 КОНФИГУРАТОР ============ -->
+<section class="sec sec-config" id="s-config">
+  <p class="kicker">04 / конфигуратор</p>
+  <h2>Собрать план внедрения под своё подразделение</h2>
+  <p class="sec-lede">Отметьте профиль работ, зрелость, ограничения и горизонт — на выходе получите
+    персональный план: шаги, первые ИИ-кейсы, артефакты, метрики, требования ИБ и расчёт эффекта.</p>
+
+  <div class="cfg" id="cfg">
+    <div class="cfg-form" id="cfgForm"></div>
+    <aside class="cfg-out" id="cfgOut" aria-live="polite"></aside>
+    <div class="cfg-actions">
+      <button class="btn btn-solid" id="cfgBuild">Собрать план</button>
+      <button class="btn btn-ghost" id="cfgCopy">Скопировать в Markdown</button>
+      <button class="btn btn-ghost" id="cfgPrint">Версия для печати</button>
+      <button class="btn btn-ghost" id="cfgReset">Сброс</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 05 КАТАЛОГ МАТЕРИАЛОВ ============ -->
+<section class="sec" id="s-evidence">
+  <p class="kicker">05 / первоисточники</p>
+  <h2>Каталог материалов конференции</h2>
+  <p class="sec-lede">19 докладов, извлечённых из архива и использованных в инструкции. Фильтр — по тегам:
+    <b>ИИ</b>, <b>ТИМ/3D</b>, <b>данные</b>, <b>расчёты</b>, <b>Изыскания</b>, <b>EPC</b>, <b>Бурение</b>.</p>
+  <div class="cat" id="catalog"></div>
+</section>
+
+<!-- ============ 06 РИСКИ ============ -->
+<section class="sec" id="s-risks">
+  <p class="kicker">06 / ограничения и риски</p>
+  <h2>Четыре причины, по которым внедрение не взлетит</h2>
+  <div class="risks" id="risks"></div>
+</section>
+
+<!-- ============ 07 ФОРМЫ ============ -->
+<section class="sec" id="s-forms">
+  <p class="kicker">07 / формы и шаблоны</p>
+  <h2>Артефакты: что производить на каждом шаге</h2>
+  <div class="forms" id="forms"></div>
+</section>
+
+<section class="sec sources" id="s-sources">
+  <p class="kicker">Приложение</p>
+  <h2>Источники и как проверить</h2>
+  <ul class="src">
+    <li>Архив материалов VIII конференции: <a href="https://disk.yandex.ru/d/Qcuz56sj1cIWUA" target="_blank" rel="noopener">«материалы конференции 2026»</a> (Яндекс.Диск, 83 комплекта файлов).</li>
+    <li>Страница конференции и официальная Программа: <a href="https://gipvn.ru/conference/" target="_blank" rel="noopener">gipvn.ru/conference</a>.</li>
+    <li>Нормативные якоря: приказ Минстроя России №&nbsp;10/128 (XML-схема задания на проектирование, приёмка только в XML с 26.01.2026); ПП РФ №&nbsp;1912 от 14.11.2023 (доверенные ПАК объектов КИИ); переход на отечественные ПАК до 2030&nbsp;г.</li>
+    <li>Все числовые значения приведены по текстам докладов; прогнозные и заявленные оценки помечены как таковые. Методика разбора — в приложении А аналитического доклада по конференции.</li>
+  </ul>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="foot-stamp">
+    <span>ИИ·ПРОЕКТ</span><span>ред. 1.0</span><span>2026</span>
+  </div>
+  <p>Сайт-инструкция построен на материалах VIII Международной научно-практической конференции
+  «Комплексный инжиниринг в нефтегазодобыче: опыт, инновации, развитие» (АО «Гипровостокнефть»).
+  Все права на доклады принадлежат авторам и организациям.</p>
+  <p class="foot-tech">Статический сайт: HTML + CSS + vanilla JS. Работает офлайн, без сборки и зависимостей.</p>
+</footer>
+
+<script src="js/data.js"></script>
+<script src="js/data2.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
