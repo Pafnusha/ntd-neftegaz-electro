@@ -1,0 +1,74 @@
+/* ============================================================
+   ИИ·ПРОЕКТ — base: переменные, типографика, «чертёжная» сетка
+   ============================================================ */
+:root{
+  --bg:#061729;
+  --bg-2:#0a2440;
+  --panel:#0d2c4d;
+  --panel-2:#113556;
+  --paper:#f4ecd9;
+  --ink:#0a1a2b;
+  --text:#dfe8f2;
+  --muted:#8ea7bf;
+  --line:rgba(120,180,235,.16);
+  --line-2:rgba(120,180,235,.30);
+  --acc:#f2572a;
+  --acc-y:#f5e39b;
+  --acc-g:#8ad6b0;
+  --shadow:0 24px 60px -30px rgba(0,0,0,.85);
+  --r:3px;
+  --dsp:'Oswald', 'PT Mono', sans-serif;
+  --body:'Golos Text', 'PT Mono', sans-serif;
+  --mono:'PT Mono', ui-monospace, monospace;
+  --maxw:1240px;
+}
+:root{ --panel-2:#113css; }
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  background:
+    radial-gradient(900px 600px at 88% -5%, rgba(242,87,42,.12), transparent 60%),
+    radial-gradient(1100px 700px at -10% 12%, rgba(60,140,210,.16), transparent 60%),
+    repeating-linear-gradient(0deg, transparent 0 39px, rgba(120,180,235,.055) 39px 40px),
+    repeating-linear-gradient(90deg, transparent 0 39px, rgba(120,180,235,.055) 39px 40px),
+    var(--bg);
+  color:var(--text);
+  font-family:var(--body);
+  font-size:clamp(15px,.55vw + 13px,17px);
+  line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+.grain{
+  position:fixed; inset:0; pointer-events:none; z-index:60; opacity:.5; mix-blend-mode:soft-light;
+  background-image:radial-gradient(rgba(255,255,255,.5) .5px, transparent .6px);
+  background-size:3px 3px;
+}
+main{display:block}
+a{color:var(--acc-y); text-decoration:none; border-bottom:1px solid transparent; transition:.2s}
+a:hover{border-color:var(--acc-y)}
+p{margin:0 0 .9em}
+b,strong{font-weight:700; color:#fff}
+::selection{background:var(--acc); color:#fff}
+
+/* ---------- typography ---------- */
+h1,h2,h3,h4{font-family:var(--dsp); font-weight:600; line-height:1.04; letter-spacing:.005em; margin:0}
+h1{font-size:clamp(38px,7vw,86px); text-transform:uppercase; font-weight:700}
+h2{font-size:clamp(26px,3.5vw,46px); text-transform:uppercase; font-weight:600; margin:0 0 .45em}
+h3{font-size:clamp(19px,2vw,25px); font-weight:600}
+h4{font-size:15px; text-transform:uppercase; letter-spacing:.1em; font-family:var(--mono); font-weight:400; color:var(--acc-y)}
+.kicker{
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.22em; text-transform:uppercase;
+  color:var(--muted); margin:0 0 14px; display:flex; align-items:center; gap:12px
+}
+.kicker::after{content:""; flex:1; height:1px; background:linear-gradient(90deg,var(--line-2),transparent)}
+.sec-lede{max-width:74ch; color:#c6d7e7; font-size:1.03em}
+.mono{font-family:var(--mono)}
+.num{font-family:var(--dsp); font-weight:700; font-variant-numeric:tabular-nums}
+
+/* ---------- stamp / label ornament ---------- */
+.stamp{
+  font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase;
+  border:1px solid var(--acc); color:var(--acc); padding:5px 10px; display:inline-block; border-radius:1px
+}

@@ -1,0 +1,46 @@
+/* ============================================================
+   ПЕЧАТЬ / PDF: превращаем сайт в одностраничный регламент
+   ============================================================ */
+@page { size: A4 portrait; margin: 14mm 13mm; }
+@media print {
+  .topbar, .menu-btn, .cfg-actions, .step-nav, .cat-filter, #catFilter,
+  .grain, .toast, .matrix-controls, .mc-search, .ticker, .mast-jump { display: none !important; }
+  body {
+    background: #fff !important; color: #0a1a2b !important; font-size: 10.5pt; line-height: 1.45;
+  }
+  .sec, .mast { max-width: none; padding: 8mm 0; border: 0 !important; }
+  .sec + .sec { border-top: 1px solid #c8ccd2 !important; }
+  h1 { font-size: 26pt; } h2 { font-size: 17pt; margin-bottom: 2mm; } h3 { font-size: 12.5pt; }
+  h4, .kicker, .ev-lab, .ev-src, .who, .step-head .dur, .p-grid b, .p-tag, .sign, .for, .code {
+    font-family: 'PT Mono', monospace; font-size: 8pt; letter-spacing: .08em;
+  }
+  .kicker { color: #8a3a1b !important; } .kicker::after { background: #c8ccd2 !important; }
+  .mast-lede, .sec-lede, .step-lede { max-width: none; color: #16283a !important; }
+  .rv { opacity: 1 !important; transform: none !important; }
+  .ev, .card, .risk, .form-card, .fld, .step-body, .matrix {
+    border: 1px solid #c8ccd2 !important; background: #fff !important; box-shadow: none !important;
+    break-inside: avoid;
+  }
+  .ev-num, .step-head .idx { color: #8a3a1b !important; }
+  .ev::before { display: none; }
+  .step-head { border-color: #c8ccd2 !important; }
+  .step-tab, .bar i, .bar { break-inside: avoid; }
+  .bar i { background: #8a3a1b !important; } .bar.g i { background: #2c5b3f !important; } .bar.y i { background: #b98a2a !important; }
+  .mat-row { break-inside: avoid; color: #0a1a2b !important; border-color: #dfe3e8 !important; }
+  .mat-row .nm, .mat-row .ds { color: #0a1a2b !important; }
+  .paper, .paper * { color: #16283a !important; }
+  .paper { border: 1px solid #8a3a1b !important; box-shadow: none !important; }
+  .cfg { display: block !important; }
+  .cfg-form { columns: 2; column-gap: 6mm; margin-bottom: 6mm; }
+  .fld { break-inside: avoid; margin-bottom: 3mm; padding: 3mm !important; }
+  .cfg-out { position: static !important; max-height: none !important; overflow: visible !important; background: #fff !important; border: 0 !important; padding: 0 !important; }
+  .opt { border: 1px solid #c8ccd2 !important; color: #0a1a2b !important; padding: 1mm 2mm !important; font-size: 8.5pt; }
+  .opt.on { border-color: #8a3a1b !important; }
+  .doc { max-height: none !important; white-space: pre-wrap !important; overflow: visible !important; font-size: 8pt; color: #16283a !important; }
+  .cards { grid-template-columns: 1fr 1fr !important; }
+  .step-cols { grid-template-columns: 1fr 1fr !important; gap: 5mm; }
+  a { color: #0a1a2b !important; border: 0 !important; text-decoration: none !important; }
+  #s-mast { page-break-after: always; }
+  .step-body, .sec { page-break-inside: auto; }
+  h2, h3 { page-break-after: avoid; }
+}
