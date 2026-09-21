@@ -83,3 +83,18 @@ footer { color: var(--muted); font-size: 12px; padding: 24px 0 40px; }
 .choice-ext .choice-kicker { color: var(--accent); }
 .choice-ext .choice-btn::after { content: " \2197"; }
 @media (max-width: 700px) { .hero h2 { font-size: 22px; } th { position: static; } }
+
+/* открытая полоса чата на главной: не модуль, поэтому отдельным блоком */
+.chat-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px;
+  margin-top: 16px; padding: 14px 16px; text-decoration: none; color: var(--text);
+  background: linear-gradient(90deg, #172a3a, #162232); border: 1px solid var(--line);
+  border-left: 3px solid var(--accent); border-radius: 14px; }
+.chat-strip:hover { border-color: var(--accent); border-left-color: var(--accent); box-shadow: 0 10px 26px rgba(0,0,0,.35); }
+.chat-tag { flex: 0 0 auto; font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+  color: #1a1200; background: var(--accent); border-radius: 999px; padding: 3px 9px; font-weight: 800; }
+.chat-txt { flex: 1 1 320px; min-width: 0; line-height: 1.45; }
+.chat-txt b { display: block; font-size: 15px; margin-bottom: 2px; }
+.chat-txt { color: var(--muted); font-size: 13px; }
+.chat-btn { flex: 0 0 auto; background: var(--accent); color: #1a1200; font-weight: 800;
+  padding: 10px 14px; border-radius: 10px; white-space: nowrap; }
+@media (max-width: 560px) { .chat-btn { width: 100%; text-align: center; } }
