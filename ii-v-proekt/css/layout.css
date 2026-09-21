@@ -149,6 +149,11 @@
   .mast-stamp{display:none}
 }
 @media (max-width:620px){
+  .topbar{gap:9px; padding:8px 12px}
+  .brand-sub{display:none}
+  .topbar-act{margin-left:auto; flex:0 1 auto; min-width:0}
+  .topbar-act .btn{padding:9px 10px; font-size:10px; letter-spacing:.05em}
+  .topbar-act .back{max-width:38vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .mast-title{font-size:clamp(31px,10vw,44px)}
   .ticker{scroll-snap-type:x mandatory}
   .tk{scroll-snap-align:start; min-width:150px}

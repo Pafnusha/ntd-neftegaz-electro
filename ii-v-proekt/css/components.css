@@ -104,6 +104,7 @@ select{min-width:180px}
   display:grid; grid-template-columns:minmax(0,2.4fr) .85fr .85fr .95fr 1.15fr 46px; gap:14px; padding:11px 16px;
   background:var(--panel); font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--acc-y)
 }
+.stepper{grid-auto-columns:minmax(96px,1fr)}
 .matrix-legend{display:flex; flex-wrap:wrap; gap:16px; margin-top:12px; font-family:var(--mono); font-size:10.5px; color:var(--muted)}
 .matrix-legend b{color:var(--acc)}
 @media (max-width:860px){
@@ -150,8 +151,3 @@ select{min-width:180px}
 }
 .form-card footer{padding:12px 18px; display:flex; gap:8px; flex-wrap:wrap; border-top:1px solid var(--line)}
 .form-card .for{font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:.06em; text-transform:uppercase}
-
-/* ссылка-кнопка «назад» в шапке (на главную ЭС-Нефтегаз) */
-a.btn{text-decoration:none; display:inline-block; text-align:center}
-a.back{border-color:var(--acc-y); color:var(--acc-y)}
-a.back:hover{background:rgba(245,227,155,.12); border-color:var(--acc-y)}
