@@ -71,7 +71,8 @@
       <button id="btn-xls" class="ghost">Excel</button>
       <button id="btn-txt" class="ghost">TXT / расчётная записка</button>
       <button id="btn-svg" class="ghost">Схема SVG (вектор)</button>
-      <button id="btn-dxf" class="ghost">Схема DXF R12 (NanoCAD / AutoCAD / Компас → DWG)</button>
+      <button id="btn-dxf" class="ghost">Схема DXF R12 — шрифт ESKD, мм (NanoCAD / AutoCAD / Компас → DWG)</button>
+      <button id="btn-fonts" class="primary" type="button">Шрифты ESKD (ГОСТ 2.1.115) — скачать zip</button>
       <button id="btn-save" class="ghost">Сохранить проект (JSON)</button>
       <button id="btn-load" class="ghost">Загрузить проект…</button>
       <input type="file" id="file-load" accept=".json" hidden>
@@ -118,7 +119,10 @@
       вводы QF1… с уставками LSI (4P ~400 В), шкафы ИБП (VC/GB(SA, QFB)/NC/SF, звено DC), выход QF3/QF4, общая байпасная линия с SF/QSB (ремонтный),
       шина ЩГП (ШСН) или ШПН-A/B и <b>фидеры групп с автоматами по фазности</b> (1~230 — 2P(L+N); 3~400 — 4P; DC — 2P(+/−)) с In, Ir, Iт.о, маркой и сечением кабеля и временем автономии группы.
       УГО — ГОСТ 2.7х ЕСКД (QF — 2.710/2.755, GB — 2.722, VC/NC/SF — 2.747). На листе: Таблица 1 — перечень сигналов в АСУ Э (RS-485/Modbus RTU, через УСПД) и примечания 1–11 (аналог В.1: LSI, независимые расцепители отключения по времени, УЗИП, ФЗП/ПУЭ 1.7, секционирование 2b и др.).
-      Экспорт: SVG (вектор) и <b>DXF R12 (ANSI_1251)</b> —NanoCAD/AutoCAD/Компас; DWG — Save As в NanoCAD.</p>
+      Экспорт: SVG (вектор) и <b>DXF R12 (ANSI_1251)</b> — NanoCAD / AutoCAD / Компас-3D; DWG — Save As в NanoCAD.
+      Чертёж — в миллиметрах (1 ед. = 1 мм); надписи — стилем <b>ESKD</b> (eskd.shx, ГОСТ 2.1.115, начертание 0,7):
+      основные 3,5 мм, таблицы/примечания 2,5 мм. Если шрифтов ESKD в САПР нет и текст «плывёт» —
+      скачайте «Шрифты ESKD (ГОСТ 2.1.115) — скачать zip» и установите комплект (инструкция внутри).</p>
   </section>
 
   <section class="panel"><h2>7. Проверка соответствия нормативам (ТУ проекта, ПУЭ, ГОСТ Р МЭК, ГОСТ IEC 62040)</h2>

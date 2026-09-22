@@ -378,8 +378,9 @@ function renderLayout(R) {
 }
 
 /* SECTION: scheme-primitives */
-function prims2svg(P) {
-  let o = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${P.W} ${P.H}" width="${P.W}" height="${P.H}" font-family="Segoe UI,Arial">`;
+function prims2svg(P, k) {
+  const K = k || 1;
+  let o = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${P.W} ${P.H}" width="${(P.W * K).toFixed(0)}" height="${(P.H * K).toFixed(0)}" font-family="Segoe UI,Arial, sans-serif">`;
   o += `<rect x="0" y="0" width="${P.W}" height="${P.H}" fill="white"/>`;
   for (const e of P.els) {
     if (e.t === "l") o += `<line x1="${e.x1}" y1="${e.y1}" x2="${e.x2}" y2="${e.y2}" stroke="${e.color || '#223344'}" stroke-width="${e.sw || 1.2}" ${e.dash ? `stroke-dasharray="${e.dash}"` : ""}/>`;
@@ -387,7 +388,12 @@ function prims2svg(P) {
     else if (e.t === "c") o += `<circle cx="${e.x}" cy="${e.y}" r="${e.r}" fill="none" stroke="${e.color || '#223344'}" stroke-width="1.2"/>`;
     else if (e.t === "n") o += `<circle cx="${e.x}" cy="${e.y}" r="${e.r || 2.2}" fill="${e.color || '#223344'}"/>`;
     else if (e.t === "p") o += `<polygon points="${e.pts.map(pt => pt.join(',')).join(' ')}" fill="none" stroke="${e.color || '#223344'}" stroke-width="1.2"/>`;
-    else if (e.t === "t") o += `<text x="${e.x}" y="${e.y}" font-size="${e.size || 9}" font-weight="${e.bold ? 700 : 400}" fill="${e.color || '#223344'}" text-anchor="${e.align || 'start'}">${(e.s || "").replace(/\n/g, "  ·  ").replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>`;
+    else if (e.t === "t") {
+      const sz = e.size || 9, txt = String(e.s || "").replace(/\n/g, "  ·  ").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      const wf = 0.72, w = txt.length * sz * wf;
+      let ax = e.x; if (e.align === "middle") ax = e.x - w / 2; else if (e.align === "end") ax = e.x - w;
+      o += `<text transform="translate(${ax.toFixed(2)} ${e.y}) scale(${wf} 1)" x="0" y="0" font-size="${sz}" font-weight="${e.bold ? 700 : 400}" fill="${e.color || '#223344'}">${txt}</text>`;
+    }
   }
   return o + "</svg>";
 }
@@ -400,7 +406,7 @@ function symQF(P, x, y, pos, inf) { // автоматический выключ
   P.els.push({ t: "r", x: x + 4, y: y - 9, w: 7, h: 4.5, stroke: "#223344", sw: 0.9 });
   P.els.push({ t: "t", x: x + 15, y: y - 9, s: pos, size: 7.5, bold: true });
   const lines = Array.isArray(inf) ? inf : (inf ? String(inf).split("\n") : []);
-  lines.forEach((ln, i) => P.els.push({ t: "t", x: x + 15, y: y + 12 + i * 8, s: ln, size: 6.5, color: "#33465e" }));
+  lines.forEach((ln, i) => P.els.push({ t: "t", x: x + 15, y: y + 13 + i * 11, s: ln, size: 5.4, color: "#33465e" }));
 }
 function symSA(P, x, y, pos, inf) { // разъединитель: ножевой контакт, видимый разрыв (ГОСТ 2.710)
   P.els.push({ t: "l", x1: x, y1: y + 11, x2: x, y2: y + 4, sw: 1.6 });
@@ -408,7 +414,7 @@ function symSA(P, x, y, pos, inf) { // разъединитель: ножево�
   P.els.push({ t: "c", x: x - 4, y: y + 5, r: 1.5 });
   P.els.push({ t: "t", x: x + 12, y: y - 8, s: pos, size: 7.5, bold: true });
   const lines = Array.isArray(inf) ? inf : (inf ? String(inf).split("\n") : []);
-  lines.forEach((ln, i) => P.els.push({ t: "t", x: x + 12, y: y + 1 + i * 8, s: ln, size: 6.5, color: "#33465e" }));
+  lines.forEach((ln, i) => P.els.push({ t: "t", x: x + 12, y: y + 2 + i * 11, s: ln, size: 5.4, color: "#33465e" }));
 }
 function symBat(P, x, y, pos, inf) { // аккумуляторная батарея: цепочка элементов (ГОСТ 2.722)
   P.els.push({ t: "l", x1: x, y1: y - 34, x2: x, y2: y - 26, sw: 1.4 });
@@ -423,7 +429,7 @@ function symBat(P, x, y, pos, inf) { // аккумуляторная батар�
   P.els.push({ t: "t", x: x - 14, y: y + 8, s: "\u2212", size: 8 });
   P.els.push({ t: "t", x: x - 22, y: y - 34, s: pos, size: 8, bold: true, align: "end" });
   const ls = Array.isArray(inf) ? inf : (inf ? String(inf).split("\n") : []);
-  ls.forEach((ln, i) => P.els.push({ t: "t", x: x + 25, y: y - 30 + i * 9, s: ln, size: 6.5, color: "#33465e" }));
+  ls.forEach((ln, i) => P.els.push({ t: "t", x: x - 26, y: y - 28 + i * 11, s: ln, size: 5.4, align: "end", color: "#33465e" }));
 }
 function symSTP(P, x, y, pos, inf) { // статический переключатель: встречно-параллельные тиристоры (ГОСТ 2.747)
   P.els.push({ t: "l", x1: x, y1: y - 15, x2: x, y2: y - 8, sw: 1.4 });
@@ -434,7 +440,7 @@ function symSTP(P, x, y, pos, inf) { // статический переключ�
   P.els.push({ t: "l", x1: x - 6, y1: y + 4, x2: x + 6, y2: y + 4, sw: 1.3 });
   P.els.push({ t: "t", x: x + 40, y: y - 14, s: pos, size: 7.5, bold: true, color: "#7a3fd8" });
   const lines = Array.isArray(inf) ? inf : (inf ? String(inf).split("\n") : []);
-  lines.forEach((ln, i) => P.els.push({ t: "t", x: x + 40, y: y + 2 + i * 8, s: ln, size: 6.5, color: "#7a3fd8" }));
+  lines.forEach((ln, i) => P.els.push({ t: "t", x: x + 40, y: y + 3 + i * 11, s: ln, size: 5.4, color: "#7a3fd8" }));
 }
 function symConv(P, x, y, w, h, kind, pos, inf) { // преобразователь (ГОСТ 2.747/2.721)
   P.els.push({ t: "r", x: x - w / 2, y: y - h / 2, w, h, fill: "#f6faff", stroke: "#223344", sw: 1.4 });
@@ -445,7 +451,7 @@ function symConv(P, x, y, w, h, kind, pos, inf) { // преобразовате�
   P.els.push({ t: "p", pts: [[x + 14, y - 10], [x + 6, y - 10], [x + 14, y - 4]] });
   P.els.push({ t: "t", x: x - w / 2, y: y - h / 2 - 4, s: pos, size: 8, bold: true });
   const lines = Array.isArray(inf) ? inf : (inf ? String(inf).split("\n") : []);
-  lines.forEach((ln, i) => P.els.push({ t: "t", x: x + w / 2 + 8, y: y - 2 + i * 8, s: ln, size: 6.5, color: "#33465e" }));
+  lines.forEach((ln, i) => P.els.push({ t: "t", x: x + w / 2 + 8, y: y - 2 + i * 10, s: ln, size: 5.4, color: "#33465e" }));
 }
 function box(P, x, y, w, h, text, sub, fill, posOut) {
   P.els.push({ t: "r", x, y, w, h, fill: fill || "#f6faff", stroke: "#223344", sw: 1.3, rx: 2 });
@@ -501,14 +507,14 @@ function schemeSL(R) {
     const bx = cx - 100, ox = cx + 95;
     /* шкаф */
     e({ t: "r", x: cx - 138, y: 94, w: 293, h: 352, fill: "none", stroke: "#98a4b5", sw: 0.9, dash: "8 4" });
-    T(cx - 130, 104, `Шкаф ИБП-${nm} · ${R.ups_kVA}${ac ? " кВА" : " кВт"} · ${ac ? "VFI·SS·1·PF1" : "DC " + s.udc + " В ±10 %"} · IP42`, { size: 6.2, bold: true });
-    T(cx - 134, 118, `габ. ${cab.L}×${cab.W}×${cab.H} мм · внутри — однолинейка шкафа`, { size: 5.4, color: "#5a6a7e" });
+    T(cx - 134, 428, `Шкаф ИБП-${nm} · ${R.ups_kVA}${ac ? " кВА" : " кВт"} · IP42`, { size: 5.4, bold: true });
+    T(cx - 134, 438, `VFI·SS·1·PF1 · ${cab.L}×${cab.W}×${cab.H}`, { size: 5.4, color: "#5a6a7e" });
     /* ввод */
     T(cx - 128, yQFin - 2, `Ввод №${i + 1}: ~400 В 50 Гц от секции №${i + 1} РУ НН`, { size: 6 });
     L(cx, yQFin + 6, cx, yQFin + 14);
     symQF(P, cx, yQFin + 22, `QF${i + 1}`, [`${R.qf_in} А · 4P`, `Ir=(0,4…1)In · LSI`]);
     L(cx, yQFin + 37, cx, yVC - 18);
-    symConv(P, cx, yVC, 110, 36, "rec", "", [`VC-${nm} ~400→${s.udc} В`, `Iзy ${f(R.I_chg, 0)} А · η ${f(s.chgEff * 100, 0)} %`]);
+    symConv(P, cx, yVC, 110, 36, "rec", `${nm}`, [`~400→${s.udc}В`, `Iзy ${f(R.I_chg, 0)}А`]);
     L(cx, yVC + 18, cx, yZ);
     /* звено DC */
     L(bx - 14, yZ, ox, yZ, 2);
@@ -517,7 +523,7 @@ function schemeSL(R) {
     /* веть АКБ */
     ND(bx, yZ);
     L(bx, yZ, bx, yZ + 12);
-    symQF(P, bx, yZ + 24, `QFB-${nm}`, `${R.qf_bat} А · 2P`);
+    symQF(P, bx, yZ + 24, `QFB-${nm}`, `2P ${R.qf_bat}А`);
     L(bx, yZ + 37, bx, yZ + 48);
     symSA(P, bx, yZ + 56, `SA-${nm}`, `т. пост. ${s.udc} В · ${R.qf_bat} А`);
     L(bx, yZ + 68, bx, yZ + 78);
@@ -531,15 +537,15 @@ function schemeSL(R) {
     /* выход */
     if (ac) {
       L(ox, yZ, ox, yNC - 18); ND(ox, yZ);
-      symConv(P, ox, yNC, 130, 32, "inv", "", [`NC-${nm} ~230 В ±1 % · 50 Гц ±1 Гц`, `S ${R.ups_kVA} кВА · I ${f(R.I_out, 0)} А`]);
+      symConv(P, ox, yNC, 130, 32, "inv", "NC", [`~230В±1% 50Гц`, `I ${f(R.I_out, 0)}А`]);
       L(ox, yNC + 16, ox, ySF - 15);
-      symSTP(P, ox, ySF, `SF-${nm}`, `${f(R.I_out, 0)} А`);
+      symSTP(P, ox, ySF, `SF-${nm}`, ["I ном " + f(R.I_out, 0) + "А"]);
       L(ox, ySF + 15, ox, yQF3 - 15);
       symQF(P, ox, yQF3, `QF${i ? 4 : 3}`, [`${R.qf_out} А · 4P · LSI`, `незав. расцеп. (откл. от АСУ Э)`]);
       L(ox, yQF3 + 15, ox, yBus); ND(ox, yBus);
     } else {
       L(ox, yZ, ox, yQF3 - 15); ND(ox, yZ);
-      symQF(P, ox, yQF3, `QF${i ? 4 : 3}`, [`${R.qf_out} А · 2P · LSI`, `незав. расцеп. (откл. от АСУ Э)`]);
+      symQF(P, ox, yQF3, `QF${i ? 4 : 3}`, [`${R.qf_out} А 2P·LSI`, `Ir0,4-1In`, `нез. расц.`]);
       L(ox, yQF3 + 15, ox, yBus); ND(ox, yBus);
     }
     if (n === 1) T(cx + 160, yQFin + 8, "Ввод №2 (резервный) не применён — без резервирования", { size: 5.6, color: "#8a97a8" });
@@ -548,9 +554,9 @@ function schemeSL(R) {
   if (ac) {
     T(xby - 60, 66, `Резервная (байпасная) линия ~400 В`, { size: 6 });
     L(xby, 70, xby, yQFin + 2);
-    symQF(P, xby, yQFin + 16, "QF10", `${R.qf_in} А · 4P`);
+    symQF(P, xby, yQFin + 16, "QF10", `4P ${R.qf_in}А`);
     L(xby, yQFin + 31, xby, yNC - 18);
-    symSTP(P, xby, yNC, "SF10", `байпас I ${f(R.I_out, 0)} А`);
+    symSTP(P, xby, yNC, "SF10", ["байпас " + f(R.I_out, 0) + "А"]);
     L(xby, yNC + 15, xby, ySF);
     symSA(P, xby, ySF + 12, "QSB", [`ремонтный байпас`, `блокировка с QF${n > 1 ? "3/QF4" : "3"}`]);
     L(xby, ySF + 28, xby, yBus);
@@ -614,7 +620,7 @@ function schemeSL(R) {
       T(tx + 14, y, rw[0], { size: 5.6 });
       T(tx + CW - 34, y, rw[1], { size: 5.6 });
       T(tx + CW - 16, y, rw[2], { size: 5.6 });
-      y += 7.6;
+      y += 10;
     });
     L(tx, yTbl + 14, tx + CW, yTbl + 14, 0.7);
     L(tx, y + 1, tx + CW, y + 1, 0.7);
@@ -629,15 +635,55 @@ function schemeSL(R) {
   /* примечания */
   const notes = notesArr(R, ac, n, fN);
   const nx0 = 40 + (CW + 16) * 2 + 10;
-  T(nx0, yTbl + 2, "Примечания", { size: 8, bold: true });
+  T(nx0, yTbl + 2, "Примечания", { size: 10, bold: true });
   let ny = yTbl + 18;
   const nWrap = Math.max(78, Math.floor((Math.max(1400, busR + 40) - nx0 - 24) / 2.72));
-  notes.forEach(nt => wrapTxt(nt, nWrap).forEach((ln, i) => { T(nx0 + (i ? 20 : 0), ny, ln, { size: 5.8 }); ny += 7.2; }));
+  notes.forEach(nt => wrapTxt(nt, nWrap).forEach((ln, i) => { T(nx0 + (i ? 24 : 0), ny, ln, { size: 5.8 }); ny += 9.2; }));
+  ny += 6;
   /* рамка листа */
   P.H = Math.max(ye1, ye2, ny) + 50;
   P.W = Math.max(P.W, 70 + fN * step + 90, nx0 + 560);
-  P.els.unshift({ t: "r", x: 6, y: 6, w: P.W - 12, h: P.H - 12, fill: "none", stroke: "#33465e", sw: 1.6 });
+  P.els.unshift({ t: "r", x: 6, y: 6, w: P.W - 12, h: P.H - 12, fill: "none", stroke: "#33465e", sw: 1.6, mmw: 0.35 });
   T(P.W - 16, P.H - 14, `Лист 1 · Листов 1 · Дата ${new Date().toLocaleDateString("ru-RU")}`, { size: 6, align: "end", color: "#5a6a7e" });
+  return mmSheet(P);
+}
+/* перевод чертежа в миллиметры: ×0,5 + высоты текста по ГОСТ 2.1.115 (ГОСТ-ряд 1,8…10);
+   в DXF 1 ед. = 1 мм, шрифт ESKD (eskd.shx), высота надписей 3,5/2,5 мм */
+function mmSheet(P) {
+  const GOST = [1.8, 2.5, 3.5, 5, 7, 10];
+  const snap = (v) => { for (const g of GOST) if (v <= g + 0.01) return g; return 10; };
+  const K = 0.5;
+  for (const e of P.els) {
+    for (const k of ["x", "y", "x1", "y1", "x2", "y2", "w", "h", "r"]) {
+      if (typeof e[k] === "number") e[k] = +(e[k] * K).toFixed(2);
+    }
+    if (e.t === "p" && e.pts) e.pts = e.pts.map(pt => [+(pt[0] * K).toFixed(2), +(pt[1] * K).toFixed(2)]);
+    if (e.t === "t") e.size = snap(+((e.size || 7) * K).toFixed(2));
+    if (typeof e.sw === "number") e.sw = +(e.sw * K).toFixed(3);
+    void GOST;
+  }
+  P.W = +(P.W * K).toFixed(1);
+  /* авто-раскладка текстов: расставляем пересекающиеся надписи по ГОСТ-шагу (не ближе 0,8 мм) */
+  const tx = P.els.filter(z => z.t === "t" && z.s);
+  const bb = (a) => { const w = String(a.s).length * a.size * 0.75; let x0 = a.x; if (a.align === "middle") x0 -= w / 2; else if (a.align === "end") x0 -= w; return { x0, y0: a.y - a.size, x1: x0 + w, y1: a.y + a.size * 0.3 }; };
+  const move = (a, dx, dy) => { a.x = +(a.x + dx).toFixed(2);
+    if (a.align === "middle") a.x = +(a.x - dx / 2).toFixed(2);
+    if (a.align === "end") a.x = +(a.x - dx).toFixed(2);
+    a.y = +(a.y + dy).toFixed(2); };
+  for (let sweep = 0; sweep < 40; sweep++) {
+    let moved = false;
+    for (let i = 0; i < tx.length; i++) for (let j = i + 1; j < tx.length; j++) {
+      const a = bb(tx[i]), b = bb(tx[j]);
+      const ox = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0), oy = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
+      if (ox > 0.3 && oy > 0.3) {
+        if (oy <= ox) { const dn = a.y0 < b.y0 ? tx[j] : tx[i]; move(dn, 0, oy + 0.8); }
+        else { const [lft, rgt] = tx[i].x <= tx[j].x ? [tx[i], tx[j]] : [tx[j], tx[i]]; move(rgt, ox + 0.8, 0); }
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  P.H = +(Math.max(P.H, ...tx.map(a => bb(a).y1)) + 10).toFixed(1);
   return P;
 }
 function signalRows(R, ac, n, fN) {
@@ -678,6 +724,7 @@ function notesArr(R, ac, n, fN) {
     `9. Защитное и функциональное заземление — по гл. 1.7 ПУЭ; не менее двух точек присоединения шины ФЗШ к ГЗШ на каждый шкаф.`,
     `10. Внутри каждого шкафа — однолинейная электрическая схема и паспортная табличка (нерж. сталь); окраска RAL 7035; подвод кабелей снизу; секционирование 2b; на вводах — амперметр и вольтметр; на лицевой панели — мнемосхема и индикация.`,
     `11. Схема выполнена укрупнённо: THDi-фильтр, вторичные цепи и аппараты, требуемые опросным листом/вендор-листом, условно не показаны, но входят в объём поставки.`,
+    `12. Шрифт надписей чертежа — по ГОСТ 2.1.115 (тип ESKD, файл eskd.shx, начертание 0,7): основные надписи 3,5 мм, таблицы и примечания 2,5 мм из ГОСТ-ряда. При отсутствии шрифта в САПР — установить комплект из папки fonts модуля (ESKD.SHP + *.SHX) либо открыть с подстановкой; при «прыгающих» знаках задать EmergencyFont = eskd_u.shx (reg-файл прилагается).`,
   ];
 }
 
@@ -854,7 +901,7 @@ function prims2dxf(P) {
   const H = P.H;
   const y = (v) => (H - v).toFixed(2);
   let o = "0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n9\n$DWGCODEPAGE\n3\nANSI_1251\n0\nENDSEC\n";
-  o += "0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n1\n0\nLAYER\n2\nSCHEME\n70\n0\n62\n7\n6\nCONTINUOUS\n0\nLAYER\n2\nTEXT\n70\n0\n62\n3\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n";
+  o += "0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLTYPE\n70\n1\n0\nLTYPE\n2\nCONTINUOUS\n70\n0\n3\nSolid line\n72\n65\n73\n0\n40\n0\n0\nENDTAB\n0\nTABLE\n2\nSTYLE\n70\n2\n0\nSTYLE\n2\nSTANDARD\n70\n0\n40\n0\n41\n1\n50\n0\n71\n0\n42\n2.5\n3\ntxt\n4\n\n0\nSTYLE\n2\nESKD\n70\n0\n40\n0\n41\n0.7\n50\n0\n71\n0\n42\n3.5\n3\neskd.shx\n4\n\n0\nENDTAB\n0\nTABLE\n2\nLAYER\n70\n2\n0\nLAYER\n2\nSCHEME\n70\n0\n62\n7\n6\nCONTINUOUS\n0\nLAYER\n2\nTEXT\n70\n0\n62\n3\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n";
   o += "0\nSECTION\n2\nENTITIES\n";
   for (const e of P.els) {
     if (e.t === "l") o += `0\nLINE\n8\nSCHEME\n10\n${e.x1.toFixed(2)}\n20\n${y(e.y1)}\n30\n0\n11\n${e.x2.toFixed(2)}\n21\n${y(e.y2)}\n31\n0\n`;
@@ -873,12 +920,13 @@ function prims2dxf(P) {
         o += `0\nLINE\n8\nSCHEME\n10\n${a2[0].toFixed(2)}\n20\n${y(a2[1])}\n30\n0\n11\n${r2[0].toFixed(2)}\n21\n${y(r2[1])}\n31\n0\n`;
       }
     } else if (e.t === "t") {
-      const sz = +(((e.size || 9) * 1.15).toFixed(2));
+      const sz = +(e.size || 3.5).toFixed(2);            // высота шрифта по ГОСТ 2.1.115, мм
       const txt = dxfSanitize(e.s || "");
-      const wE = txt.length * sz * 0.52 + 3;
+      const wE = txt.length * sz * 0.74 + 2;              // ширина с учётом наклонного начертания 0,7
       let tx = e.x;
       if (e.align === "middle") tx -= wE / 2; else if (e.align === "end") tx -= wE;
-      o += `0\nTEXT\n8\nTEXT\n10\n${tx.toFixed(2)}\n20\n${(y(e.y) - sz * 0.2).toFixed(2)}\n30\n0\n40\n${sz.toFixed(2)}\n1\n${txt}\n`;
+      let rot = e.align === "start" ? "" : `72\n${e.align === "middle" ? 1 : 2}\n11\n${e.x.toFixed(2)}\n21\n${y(e.y)}\n31\n0\n73\n0\n`;
+      o += `0\nTEXT\n8\nTEXT\n10\n${tx.toFixed(2)}\n20\n${(y(e.y) - sz * 0.2).toFixed(2)}\n30\n0\n40\n${sz}\n41\n1\n7\nESKD\n1\n${txt}\n${rot}`;
     }
   }
   return o + "0\nENDSEC\n0\nEOF\n";
@@ -948,7 +996,7 @@ function run() {
   LAST_R = R;
   R.spec = specRows(R);
   renderUps(R); renderBat(R); renderRacks(R); renderLayout(R);
-  $("out-scheme").innerHTML = prims2svg(currentScheme(R));
+  $("out-scheme").innerHTML = prims2svg(currentScheme(R), 4);
   renderChecks(R); renderSpec(R); renderMethod(R);
 }
 function boot() {
@@ -963,8 +1011,12 @@ function boot() {
   $("btn-print").onclick = () => window.print();
   $("btn-xls").onclick = () => { run(); if (LAST_R) dl(`IBP_${LAST_R.s.proj}.xls`, makeXls(LAST_R)); };
   $("btn-txt").onclick = () => { if (LAST_R) dl(`IBP_${LAST_R.s.proj}_zapiska.txt`, new Blob(["\ufeff" + txtNote(LAST_R)], { type: "text/plain;charset=utf-8" })); };
-  $("btn-svg").onclick = () => { if (LAST_R) dl(`IBP_${LAST_R.s.proj}_shema.svg`, new Blob([prims2svg(currentScheme(LAST_R))], { type: "image/svg+xml" })); };
+  $("btn-svg").onclick = () => { if (LAST_R) dl(`IBP_${LAST_R.s.proj}_shema.svg`, new Blob([prims2svg(currentScheme(LAST_R), 4)], { type: "image/svg+xml" })); };
   $("btn-dxf").onclick = () => { if (LAST_R) dl(`IBP_${LAST_R.s.proj}_shema.dxf`, dxfBlob(currentScheme(LAST_R))); };
+  $("btn-fonts").onclick = () => {
+    const u = location.href.replace(/[^/]*$/, "") + "fonts/ESKD-GOST-shrifts.zip";
+    fetch(u).then(r => { if (!r.ok) throw 0; return r.blob(); }).then(b => dl("ESKD-GOST-shrifts.zip", b)).catch(() => window.open(u, "_blank"));
+  };
   $("btn-save").onclick = () => {
     const d = {}; IDS.forEach(id => { d[id] = id === "grp-on" ? $("grp-on").checked : val(id); });
     d.GRP = GRP; d._date = new Date().toISOString();
