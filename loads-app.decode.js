@@ -1,13 +1,8 @@
-(function(){
-  function load(urls, cb){
-    var i=0, parts=[];
-    function next(){
-      if(i>=urls.length){ cb(parts.join("")); return; }
-      fetch(urls[i++]).then(function(r){ return r.text(); }).then(function(t){ parts.push(t.trim()); next(); });
-    }
-    next();
-  }
-  load(['loads-app.b64.0', 'loads-app.b64.1', 'loads-app.b64.2', 'loads-app.b64.3', 'loads-app.b64.4', 'loads-app.b64.5', 'loads-app.b64.6'], function(b64){
-    var s=document.createElement("script"); s.text=atob(b64); document.head.appendChild(s);
-  });
+(async function(){
+  var b64=await (await fetch('loads-app.gz.b64')).text();
+  var bin=Uint8Array.from(atob(b64), function(c){return c.charCodeAt(0);});
+  var ds=new DecompressionStream('gzip');
+  var stream=new Response(bin).body.pipeThrough(ds);
+  var text=await new Response(stream).text();
+  var s=document.createElement('script'); s.text=text; document.head.appendChild(s);
 })();
