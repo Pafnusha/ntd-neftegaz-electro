@@ -9,7 +9,7 @@
 <body>
 <div class="wrap">
   <header>
-    <span class="badge">ТУ 3300-E-000-EL-SPE-00021-00-D (Ямал СПГ) · ГОСТ Р МЭК 60896-21-2013 · ГОСТ Р МЭК 62485-2-2011 · ПУЭ 7-е изд. · IEC 62040 / 60146</span>
+    <span class="badge">ТУ проекта 3300-E-000-EL-SPE-00021-00-D_02U · ГОСТ IEC 62040-1-2024 · ГОСТ IEC 62040-2 · ГОСТ IEC 62040-3-2024 · ГОСТ IEC 62040-5-3-2024 · ГОСТ Р МЭК 60896-21-2013 · ГОСТ Р МЭК 62485-2-2011 · ПУЭ 7-е изд. · IEC 60146</span>
     <h1>Расчётный модуль: расчёт и выбор систем ИБП (AC/DC)</h1>
     <p class="sub">Подбор ИБП с резервированием 2×100%, расчёт ёмкости АКБ, стеллажей, нагрузки на пол, компоновки,
       однолинейной схемы и обезличенной спецификации. Проверка соответствия ТУ и ГОСТ.
@@ -22,7 +22,7 @@
       <label class="field">Тип нагрузки
         <select id="p-type"><option value="ac">Переменного тока (AC UPS)</option><option value="dc">Постоянного тока (DC UPS)</option></select>
       </label>
-      <label class="field">Название проекта<input id="proj-name" value="ИБП-Ямал-01"></label>
+      <label class="field">Название проекта<input id="proj-name" value="ИБП-01"></label>
       <label class="field">Нагрузка P, кВт<input id="p-kw" type="number" step="0.1" value="20"></label>
       <label class="field">Коэффициент мощности cos φ<input id="p-cos" type="number" step="0.01" min="0.5" max="1" value="0.9" disabled>
       </label>
@@ -36,7 +36,7 @@
       <label class="field">Напряжение шины постоянного тока, В
         <select id="u-dc">
           <option value="24">24</option><option value="48">48</option>
-          <option value="110">110 (оперативный DC, ТУ Ямал)</option>
+          <option value="110">110 (оперативный DC, ТУ: 110 В ±10 %)</option>
           <option value="220">220</option><option value="240" selected>240 (звено DC ИБП AC)</option>
         </select>
       </label>
@@ -44,7 +44,7 @@
         <select id="u-end"><option value="1.70">1,70</option><option value="1.75" selected>1,75</option><option value="1.80">1,80</option></select>
       </label>
       <label class="field">Схема резервирования
-        <select id="red"><option value="2x100" selected>2×100% (обязательно по ТУ Ямал СПГ)</option><option value="n1">N+1</option><option value="1">без резерва</option></select>
+        <select id="red"><option value="2x100" selected>2×100% (обязательно по ТУ проекта)</option><option value="n1">N+1</option><option value="1">без резерва</option></select>
       </label>
       <label class="field">Подбор АКБ
         <select id="bat-mode"><option value="auto" selected>автоматически из базы</option><option value="manual">вручную</option></select>
@@ -70,8 +70,8 @@
       <button id="btn-print" class="ghost">Печать / PDF</button>
       <button id="btn-xls" class="ghost">Excel</button>
       <button id="btn-txt" class="ghost">TXT / расчётная записка</button>
-      <button id="btn-svg" class="ghost">Схема SVG (DWG-ready)</button>
-      <button id="btn-dxf" class="ghost">Схема DXF (AutoCAD/Компас)</button>
+      <button id="btn-svg" class="ghost">Схема SVG (вектор)</button>
+      <button id="btn-dxf" class="ghost">Схема DXF R12 (NanoCAD / AutoCAD / Компас → DWG)</button>
       <button id="btn-save" class="ghost">Сохранить проект (JSON)</button>
       <button id="btn-load" class="ghost">Загрузить проект…</button>
       <input type="file" id="file-load" accept=".json" hidden>
@@ -93,18 +93,21 @@
     <div id="out-racks"></div>
   </section>
 
-  <section class="panel"><h2>5. Компоновка помещения (2D)</h2>
+  <section class="panel"><h2>5. Компоновка помещения (2D) — реальные габариты, рядность стеллажей ≤ 3</h2>
     <div id="out-layout" class="scheme"></div>
     <p class="note" id="out-layout-note"></p>
   </section>
 
   <section class="panel"><h2>6. Структурная (принципиальная) схема ИБП — по ГОСТ 2.701-2008, ГОСТ 2.702-2011</h2>
     <div id="out-scheme" class="scheme"></div>
-    <p class="note">Условные графические обозначения: выпрямитель (~/=), инвертор (=~/), статический переключатель (STP),
-      автоматические выключатели (QF), батарейные разъединители (SA), щиты (Ш). Базовый лист — аналог 3110-G-745-EL-SLD-00102-01-D.</p>
+    <p class="note">УГО по ЕСКД (ГОСТ 2.710, 2.721, 2.722, 2.730, 2.747): преобразователь — квадрат со знаками «~»/«=» и стрелкой;
+      автоматический выключатель QF — контакт с расцепителем; разъединитель SA — ножевой контакт с видимым разрывом;
+      батарея GB — цепи элементов по ГОСТ 2.722; статический переключатель SF — встречно-параллельные тиристоры.
+      Все позиционные обозначения и параметры заполнены по расчёту. Выгрузка DXF R12 (кириллица \U+XXXX) открывается в NanoCAD,
+      AutoCAD, Компас-3D; DWG — сохранение средствами NanoCAD (File → Save As DWG).</p>
   </section>
 
-  <section class="panel"><h2>7. Проверка соответствия нормативам (ТУ Ямал СПГ, ПУЭ, ГОСТ Р МЭК)</h2>
+  <section class="panel"><h2>7. Проверка соответствия нормативам (ТУ проекта, ПУЭ, ГОСТ Р МЭК, ГОСТ IEC 62040)</h2>
     <div id="out-check"></div>
   </section>
 
