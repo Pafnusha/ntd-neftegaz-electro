@@ -3,14 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>РТМ — загрузка…</title>
+  <title>RTM loads bootstrap</title>
 </head>
 <body>
 <script>
 (async function () {
   try {
     async function get(u){ return (await (await fetch(u)).text()).trim(); }
-    var b64 = (await get('loads.html.gz.b64.0')) + (await get('loads.html.gz.b64.1'));
+    var parts = [];
+    for (var i = 0; i < 3; i++) parts.push(await get('loads.html.gz.b64.' + i));
+    var b64 = parts.join('');
     while (b64.length % 4) b64 += '=';
     var bin = Uint8Array.from(atob(b64), function (c) { return c.charCodeAt(0); });
     var ds = new DecompressionStream('gzip');
@@ -20,7 +22,7 @@
     document.write(text);
     document.close();
   } catch (e) {
-    document.body.textContent = 'Ошибка загрузки loads.html: ' + e;
+    document.body.textContent = 'loads.html load error: ' + e;
   }
 })();
 </script>
