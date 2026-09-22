@@ -36,6 +36,11 @@
     table.ep th{text-align:left;background:#f0f4fa;color:var(--muted);font-size:.72rem;padding:.5rem .4rem}
     table.ep td{padding:.28rem .32rem;border-bottom:1px solid #eef1f6}
     table.ep input{width:100%;padding:.3rem .35rem;border:1px solid transparent;border-radius:6px;background:#f8fafc}
+    table.ep select{width:100%;padding:.25rem;border:1px solid #d8dee8;border-radius:6px;background:#f8fafc}
+    .gdbox{overflow:auto;background:#fbfcfe;border:1px dashed #c5d4ea;border-radius:10px;padding:.5rem;margin:.6rem 0;min-height:0;max-width:100%}
+    .gdbox:empty{display:none}
+    #gd-check table td,#gd-check table th{border:1px solid #e3e9f2;padding:.25rem .4rem;font-size:.8rem}
+    .ok{color:#1b8a3f;font-weight:700}.bad{color:#c62828;font-weight:700}
     footer{text-align:center;color:var(--muted);font-size:.8rem;margin-top:1rem}
     a{color:var(--accent)}
   </style>
@@ -57,6 +62,13 @@
           <option value="demand">Коэффициент спроса</option>
         </select>
       </label>
+      <label class="field">Что проектируем
+        <select id="site-type">
+          <option value="ktp" selected>КТП 10(6)/0,4 кВ (2 тр-ра, две секции)</option>
+          <option value="nku">ЩИТ НКУ 0,4 кВ (панели)</option>
+        </select>
+      </label>
+      <label class="field">Iкз(3) на шинах НН, кА<input id="ikz-input" type="number" min="1" step="0.1" value="20"></label>
       <label class="field">Таблица Кр
         <select id="kr-table-select">
           <option value="table1">Питающие сети (табл.1)</option>
@@ -119,16 +131,39 @@
         <thead>
           <tr>
             <th>#</th><th>Наименование</th><th>n</th><th>Pн ед., кВт</th><th>Pн, кВт</th>
-            <th>Ки</th><th>cos φ</th><th>tg φ</th><th>P=Ки·Pн</th><th>Q=Ки·Pн·tg</th><th>n·Pн²</th><th>Кс</th><th></th>
+            <th>Ки</th><th>cos φ</th><th>tg φ</th><th>P=Ки·Pн</th><th>Q=Ки·Pн·tg</th><th>n·Pн²</th><th>Кс</th><th>Кат.</th><th></th>
           </tr>
         </thead>
         <tbody id="ep-tbody"></tbody>
       </table>
     </div>
   </section>
+  <section class="panel">
+    <h2>Схемы и планировка (формируются автоматически из ведомости нагрузок)</h2>
+    <div class="toolbar">
+      <button type="button" class="primary" id="btn-gsl">Отрисовать однолинейную схему</button>
+      <button type="button" class="primary" id="btn-gpanel">Отрисовать структуру щита (панели НКУ)</button>
+      <button type="button" class="primary" id="btn-glayout">Планировка размещения (НТД РФ)</button>
+      <button type="button" id="btn-gdxf">Схема в DXF (NanoCAD / AutoCAD / Компас)</button>
+      <button type="button" id="btn-gdxf-lay">Планировка в DXF</button>
+      <button type="button" class="ghost" id="btn-greset">Сброс расстановки блоков</button>
+      <a href="fonts/ESKD-GOST-shrifts.zip" download style="align-self:center"><b>Шрифты ESKD (ГОСТ&nbsp;2.1.115) — .zip</b></a>
+    </div>
+    <p class="note">Шрифт надписей в DXF — <b>ESKD</b> (eskd.shx, начертание 0,7; высота надписей из ГОСТ-ряда 2,5…3,5 мм), единицы листа — 1&nbsp;мм;
+      если в САПР нет шрифта и надписи «плывут» — скачайте архив справа и установите (инструкция внутри). Однолинейная схема, состав фидеров,
+      номиналы автоматов и кабели строятся по строкам ведомости; категории питания (И/II/III) — из колонки «Кат.» (для Кат. I — двухлучевое
+      питание от обеих секций с АВР). Требования приняты по ТУ проекта (спецтребования к сухим тр-рам и резервированию) и НТД РФ: ПУЭ, СП 256.1325800,
+      ГОСТ 2.702/2.701/2.710/2.755/2.722/2.746/2.747.</p>
+    <div id="gd-scheme" class="gdbox"></div>
+    <div id="gd-layout" class="gdbox"></div>
+    <div id="gd-check"></div>
+    <p class="note" id="gd-hint">Блоки планировки перемещаются мышью/пальцем (snap 50 мм); размеры и проверка проходов обновляются на лету.</p>
+  </section>
   <footer>ЭС-Нефтегаз</footer>
 </div>
-<script src="loads-app.js?v=6"></script>
+<script src="loads-gost.js?v=1"></script>
+<script src="loads-app.js?v=7"></script>
 <script src="word-export.js?v=2"></script>
+<script src="loads-draw.js?v=1"></script>
 </body>
 </html>
