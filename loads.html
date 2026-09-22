@@ -3,167 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>РТМ — расчёт нагрузок и КУ</title>
-  <style>
-    :root{--bg:#f4f6fa;--ink:#1a2332;--muted:#5a6a7e;--border:#d8dee8;--accent:#1b6ef3;--soft:#e8f0fe;--danger:#c62828}
-    *{box-sizing:border-box}
-    body{margin:0;font-family:Segoe UI,system-ui,Arial,sans-serif;color:var(--ink);background:radial-gradient(900px 400px at 10% -10%,#dbe8ff,transparent 55%),var(--bg)}
-    .wrap{max-width:1440px;margin:0 auto;padding:1.1rem 1rem 2.5rem}
-    h1{margin:.2rem 0 .35rem;font-size:1.6rem}
-    .sub{margin:0;color:var(--muted)}
-    .badge{display:inline-block;background:var(--soft);color:var(--accent);font-size:.75rem;font-weight:700;padding:.15rem .5rem;border-radius:999px}
-    .panel{background:#fff;border:1px solid var(--border);border-radius:12px;padding:1rem;margin:1rem 0;box-shadow:0 8px 24px rgba(26,35,50,.07)}
-    .panel h2{margin:0 0 .8rem;font-size:1.05rem}
-    .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.7rem;align-items:end}
-    label.field{display:flex;flex-direction:column;gap:.25rem;font-size:.8rem;color:var(--muted);font-weight:700}
-    input,select,button{font:inherit}
-    label.field input,label.field select{padding:.45rem .55rem;border:1px solid var(--border);border-radius:8px;font-weight:500;color:var(--ink)}
-    label.check{display:flex;gap:.45rem;align-items:center;padding-top:1.2rem;font-weight:600}
-    .toolbar{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.85rem}
-    button{border:1px solid var(--border);background:#fff;border-radius:9px;padding:.48rem .85rem;font-weight:700;cursor:pointer}
-    button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-    button.ghost{background:transparent}
-    .btn-icon{padding:.1rem .4rem;min-width:1.7rem}
-    .btn-icon.danger{color:var(--danger)}
-    .totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:.55rem}
-    .metric{background:#f3f6fb;border:1px solid var(--border);border-radius:10px;padding:.65rem .75rem}
-    .metric .lbl{font-size:.68rem;text-transform:uppercase;color:var(--muted);font-weight:700}
-    .metric .val{font-size:1.15rem;font-weight:800;margin-top:.1rem}
-    .metric.hi{background:var(--soft)}
-    .note{color:var(--muted);font-size:.85rem;margin:.7rem 0 0}
-    .table-wrap{overflow:auto;border:1px solid var(--border);border-radius:10px}
-    table.ep{width:100%;border-collapse:collapse;min-width:1080px;font-size:.88rem}
-    table.ep th{text-align:left;background:#f0f4fa;color:var(--muted);font-size:.72rem;padding:.5rem .4rem}
-    table.ep td{padding:.28rem .32rem;border-bottom:1px solid #eef1f6}
-    table.ep input{width:100%;padding:.3rem .35rem;border:1px solid transparent;border-radius:6px;background:#f8fafc}
-    table.ep select{width:100%;padding:.25rem;border:1px solid #d8dee8;border-radius:6px;background:#f8fafc}
-    .gdbox{overflow:auto;background:#fbfcfe;border:1px dashed #c5d4ea;border-radius:10px;padding:.5rem;margin:.6rem 0;min-height:0;max-width:100%}
-    .gdbox:empty{display:none}
-    #gd-check table td,#gd-check table th{border:1px solid #e3e9f2;padding:.25rem .4rem;font-size:.8rem}
-    .ok{color:#1b8a3f;font-weight:700}.bad{color:#c62828;font-weight:700}
-    footer{text-align:center;color:var(--muted);font-size:.8rem;margin-top:1rem}
-    a{color:var(--accent)}
-  </style>
+  <title>RTM loads bootstrap</title>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <span class="badge">РТМ 36.18.32.4-92 · ведомость · КУ</span>
-    <h1>Расчёт электрических нагрузок</h1>
-    <p class="sub">ИТОГО, Ко и КУ. Выгрузка в Excel и Word — числа без формул.
-      <a href="index.html">Главная</a> · <a href="ntd.html">НТД РФ</a></p>
-  </header>
-  <section class="panel">
-    <h2>Параметры расчёта</h2>
-    <div class="controls">
-      <label class="field">Режим
-        <select id="mode-select">
-          <option value="rtm">РТМ (Ки, Кр, nэ)</option>
-          <option value="demand">Коэффициент спроса</option>
-        </select>
-      </label>
-      <label class="field">Что проектируем
-        <select id="site-type">
-          <option value="ktp" selected>КТП 10(6)/0,4 кВ (2 тр-ра, две секции)</option>
-          <option value="nku">ЩИТ НКУ 0,4 кВ (панели)</option>
-        </select>
-      </label>
-      <label class="field">Iкз(3) на шинах НН, кА<input id="ikz-input" type="number" min="1" step="0.1" value="20"></label>
-      <label class="field">Таблица Кр
-        <select id="kr-table-select">
-          <option value="table1">Питающие сети (табл.1)</option>
-          <option value="table2">Шины НН (табл.2)</option>
-        </select>
-      </label>
-      <label class="field">Uн, кВ<input id="un-input" type="number" min="0.1" step="0.01" value="0.4"></label>
-      <label class="field">Кс группы<input id="group-ks" type="number" min="0" max="1" step="0.01" value="0.5"></label>
-      <label class="field">Ко (одновременность)<input id="ko-input" type="number" min="0" max="1" step="0.01" value="0.9"></label>
-      <label class="field">cosφ проектировщика<input id="cos-target" type="number" min="0.1" max="0.999" step="0.01" value="0.95"></label>
-      <label class="check"><input id="kr-override" type="checkbox"> Задать Кр вручную</label>
-      <label class="field">Кр (ручной)<input id="kr-manual" type="number" min="0" step="0.01" value="1" disabled></label>
-    </div>
-    <div class="toolbar">
-      <button type="button" class="primary" id="btn-excel">Скачать Excel</button>
-      <button type="button" class="primary" id="btn-word">Скачать Word</button>
-      <button type="button" id="btn-save-json">Сохранить JSON</button>
-      <button type="button" id="btn-load-json">Загрузить JSON</button>
-      <input id="file-json" type="file" accept=".json,application/json" hidden>
-      <button type="button" class="ghost" id="btn-reset">Демо промысел</button>
-      <button type="button" id="btn-add">+ Добавить строку</button>
-    </div>
-  </section>
-  <section class="panel">
-    <h2>ИТОГО по узлу</h2>
-    <div class="totals">
-      <div class="metric"><div class="lbl">ΣPн, кВт</div><div class="val" id="out-Pn">—</div></div>
-      <div class="metric"><div class="lbl">ΣКи·Pн, кВт</div><div class="val" id="out-KiPn">—</div></div>
-      <div class="metric"><div class="lbl">Ки ср</div><div class="val" id="out-KiAvg">—</div></div>
-      <div class="metric"><div class="lbl">cosφ ср</div><div class="val" id="out-cos1">—</div></div>
-      <div class="metric"><div class="lbl">tgφ ср</div><div class="val" id="out-tg">—</div></div>
-      <div class="metric"><div class="lbl">nэ</div><div class="val" id="out-ne">—</div></div>
-      <div class="metric"><div class="lbl">Кр</div><div class="val" id="out-kr">—</div></div>
-      <div class="metric hi"><div class="lbl">Рр итого, кВт</div><div class="val" id="out-Pp">—</div></div>
-      <div class="metric hi"><div class="lbl">Qр итого, квар</div><div class="val" id="out-Qp">—</div></div>
-      <div class="metric hi"><div class="lbl">Sр итого, кВ·А</div><div class="val" id="out-Sp">—</div></div>
-      <div class="metric hi"><div class="lbl">Iр, А</div><div class="val" id="out-Ip">—</div></div>
-    </div>
-    <p class="note" id="kr-note"></p>
-  </section>
-  <section class="panel">
-    <h2>Итого с Ко и конденсаторная установка</h2>
-    <div class="totals">
-      <div class="metric"><div class="lbl">Рр·Ко, кВт</div><div class="val" id="out-PpKo">—</div></div>
-      <div class="metric"><div class="lbl">Qр·Ко, квар</div><div class="val" id="out-QpKo">—</div></div>
-      <div class="metric"><div class="lbl">Sр·Ко, кВ·А</div><div class="val" id="out-SpKo">—</div></div>
-      <div class="metric"><div class="lbl">tgφ₂ после КУ</div><div class="val" id="out-tg2">—</div></div>
-      <div class="metric hi"><div class="lbl">Qку, квар</div><div class="val" id="out-Qc">—</div></div>
-      <div class="metric"><div class="lbl">Q после КУ, квар</div><div class="val" id="out-Qp2">—</div></div>
-      <div class="metric hi"><div class="lbl">S после КУ, кВ·А</div><div class="val" id="out-Sp2">—</div></div>
-      <div class="metric"><div class="lbl">I после КУ, А</div><div class="val" id="out-Ip2">—</div></div>
-      <div class="metric hi"><div class="lbl">Sтр реком., кВ·А</div><div class="val" id="out-Str">—</div></div>
-    </div>
-    <p class="note" id="ku-note"></p>
-  </section>
-  <section class="panel">
-    <h2>Электроприёмники</h2>
-    <div class="table-wrap">
-      <table class="ep">
-        <thead>
-          <tr>
-            <th>#</th><th>Наименование</th><th>n</th><th>Pн ед., кВт</th><th>Pн, кВт</th>
-            <th>Ки</th><th>cos φ</th><th>tg φ</th><th>P=Ки·Pн</th><th>Q=Ки·Pн·tg</th><th>n·Pн²</th><th>Кс</th><th>Кат.</th><th></th>
-          </tr>
-        </thead>
-        <tbody id="ep-tbody"></tbody>
-      </table>
-    </div>
-  </section>
-  <section class="panel">
-    <h2>Схемы и планировка (формируются автоматически из ведомости нагрузок)</h2>
-    <div class="toolbar">
-      <button type="button" class="primary" id="btn-gsl">Отрисовать однолинейную схему</button>
-      <button type="button" class="primary" id="btn-gpanel">Отрисовать структуру щита (панели НКУ)</button>
-      <button type="button" class="primary" id="btn-glayout">Планировка размещения (НТД РФ)</button>
-      <button type="button" id="btn-gdxf">Схема в DXF (NanoCAD / AutoCAD / Компас)</button>
-      <button type="button" id="btn-gdxf-lay">Планировка в DXF</button>
-      <button type="button" class="ghost" id="btn-greset">Сброс расстановки блоков</button>
-      <a href="fonts/ESKD-GOST-shrifts.zip" download style="align-self:center"><b>Шрифты ESKD (ГОСТ&nbsp;2.1.115) — .zip</b></a>
-    </div>
-    <p class="note">Шрифт надписей в DXF — <b>ESKD</b> (eskd.shx, начертание 0,7; высота надписей из ГОСТ-ряда 2,5…3,5 мм), единицы листа — 1&nbsp;мм;
-      если в САПР нет шрифта и надписи «плывут» — скачайте архив справа и установите (инструкция внутри). Однолинейная схема, состав фидеров,
-      номиналы автоматов и кабели строятся по строкам ведомости; категории питания (И/II/III) — из колонки «Кат.» (для Кат. I — двухлучевое
-      питание от обеих секций с АВР). Требования приняты по ТУ проекта (спецтребования к сухим тр-рам и резервированию) и НТД РФ: ПУЭ, СП 256.1325800,
-      ГОСТ 2.702/2.701/2.710/2.755/2.722/2.746/2.747.</p>
-    <div id="gd-scheme" class="gdbox"></div>
-    <div id="gd-layout" class="gdbox"></div>
-    <div id="gd-check"></div>
-    <p class="note" id="gd-hint">Блоки планировки перемещаются мышью/пальцем (snap 50 мм); размеры и проверка проходов обновляются на лету.</p>
-  </section>
-  <footer>ЭС-Нефтегаз</footer>
-</div>
-<script src="loads-gost.js?v=1"></script>
-<script src="loads-app.js?v=7"></script>
-<script src="word-export.js?v=2"></script>
-<script src="loads-draw.js?v=1"></script>
+<script>
+(async function () {
+  try {
+    async function get(u){ return (await (await fetch(u)).text()).trim(); }
+    var parts = [];
+    for (var i = 0; i < 3; i++) parts.push(await get('loads.html.gz.b64.' + i));
+    var b64 = parts.join('');
+    while (b64.length % 4) b64 += '=';
+    var bin = Uint8Array.from(atob(b64), function (c) { return c.charCodeAt(0); });
+    var ds = new DecompressionStream('gzip');
+    var stream = new Response(bin).body.pipeThrough(ds);
+    var text = await new Response(stream).text();
+    document.open();
+    document.write(text);
+    document.close();
+  } catch (e) {
+    document.body.textContent = 'loads.html load error: ' + e;
+  }
+})();
+</script>
 </body>
 </html>

@@ -1,0 +1,9 @@
+{
+  "name": "loads-core",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Digital electrical network model core for RTM loads module",
+  "scripts": {
+    "test": "node tests/run-tests.js"
+  }
+}
