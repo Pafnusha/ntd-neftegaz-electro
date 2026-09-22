@@ -79,7 +79,21 @@
     <p class="note" id="err-box" role="alert"></p>
   </section>
 
-  <section class="panel"><h2>2. Расчёт мощности и выбор ИБП</h2>
+  <section class="panel">
+    <h2>1а. Группы нагрузки с разным временем автономии</h2>
+    <div class="toolbar" style="margin-top:0">
+      <label class="check" style="padding-top:0;font-size:.82rem"><input type="checkbox" id="grp-on"> Учитывать ступенчато: каждая нагрузка работает своё время</label>
+      <button id="btn-load-add" class="ghost" type="button">+ Добавить нагрузку</button>
+      <span class="note" style="align-self:center">Базовая нагрузка и её время — из п. 1 (неснимаемая).</span>
+    </div>
+    <div class="table-wrap"><table id="grp-table"></table></div>
+    <p class="note">Ёмкость АКБ при ступенчатом графике считается по ГОСТ Р МЭК 60896-21: для каждого момента времени t
+      суммируются отданные А·ч и делятся на коэффициент использования K<sub>t</sub>(t); принимается максимум.
+      Фидеры с группами показываются на схеме. Распределительная сетка мощности в разделе 3.</p>
+  </section>
+
+  <section class="panel">
+    <h2>2. Расчёт мощности и выбор ИБП</h2>
     <div class="totals" id="out-ups-m"></div>
     <div id="out-ups" class="steps"></div>
   </section>

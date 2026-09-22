@@ -29,6 +29,12 @@ function upsOf(kVA) { for (const u of UPSRated_kVA) if (u >= kVA) return u; retu
 function round100(x) { return Math.ceil(x / 1) * 1; }
 
 /* SECTION: inputs */
+let GRP = [
+  { name: "Освещение аварийное", p: 2, t: 120 },
+  { name: "КИП и АСУ ТП (шкаф)", p: 1.5, t: 60 },
+  { name: "Приводы отключения", p: 6, t: 30 }
+];
+try { const g0 = localStorage.getItem("ibp-grps"); if (g0) GRP = JSON.parse(g0); } catch (e) {}
 function readState() {
   const s = {
     type: val("p-type"), proj: val("proj-name"),
@@ -41,13 +47,15 @@ function readState() {
     batAh: num("bat-ah"), batV: num("bat-v"), batLife: num("bat-life"),
     ip: val("ip-uc"), chgEff: num("chg-eff") / 100,
     roomL: num("room-l"), roomW: num("room-w"), floor: num("floor-load"),
-    seismic: num("seismic"), cableLen: num("cable-len")
+    seismic: num("seismic"), cableLen: num("cable-len"),
+    grpOn: $("grp-on") ? $("grp-on").checked : false,
+    grps: GRP.map(g => ({ name: g.name, p: +g.p || 0, t: +g.t || 0 }))
   };
   return s;
 }
 function validate(s) {
   const e = [];
-  if (s.P <= 0) e.push("Укажите мощность нагрузки (>0).");
+  if (s.P <= 0) e.push("Укажите мощность базовой нагрузки (>0).");
   if (s.tmin <= 0) e.push("Укажите время автономии (>0).");
   if (s.type === "ac") { if (s.cos < 0.5 || s.cos > 1) e.push("cos φ должен быть 0,5…1."); if (s.eff <= 0.5 || s.eff > 1) e.push("КПД инвертора должен быть 50…100%."); }
   if (s.kodn <= 0 || s.kodn > 1) e.push("Коэффициент одновременности — 0…1.");
@@ -55,6 +63,7 @@ function validate(s) {
   if (uEndRangeErr(s)) e.push("Конечное напряжение 1,6…1,9 В/эл.");
   if (s.batMode === "manual" && (s.batAh <= 0 || s.batV <= 0)) e.push("Для ручного ввода укажите V и А·ч блока АКБ.");
   if (s.roomL <= 2 || s.roomW <= 2) e.push("Габариты помещения — не менее 2×2 м.");
+  if (s.grpOn) s.grps.forEach((g, i) => { if (g.p <= 0 || g.t <= 0) e.push(`Группа ${i + 1} «${g.name}»: укажите мощность и время (>0).`); });
   return e;
 }
 function uEndRangeErr(s) { return s.uend < 1.6 || s.uend > 1.9; }
@@ -65,59 +74,88 @@ function calc(s) {
   /* --- 2.x Мощность ИБП --- */
   const isAC = s.type === "ac";
   R.Uout = isAC ? 230 : s.udc;
-  R.S_kVA = isAC ? s.P / s.cos : s.P;                       // полная мощность нагрузки, кВА/кВт
-  R.S_base = R.S_kVA * s.kodn;                                 // расчётная полная нагрузка, кВА
-  R.S_inst = isAC ? R.S_base * (1 - s.motX + s.motX * s.motK) : R.S_base; // с учётом пусковых токов
-  R.nsys = s.red === "2x100" ? 2 : (s.red === "n1" ? 2 : 1);   // N+1 условно 2 шт. на N=1
-  R.S1req = Math.max(R.S_base, R.S_inst) * s.kzap;             //_req на ОДНУ систему (2×100 % — каждая 100 %), с запасом ТУ
+  R.Ppeak = s.grpOn ? s.P + s.grps.reduce((a, g) => a + (+g.p || 0), 0) : s.P; // пик мгновенной нагрузки с группами
+  R.S_kVA = isAC ? R.Ppeak / s.cos : R.Ppeak;                              // полная мощность нагрузки, кВА/кВт
+  R.S_base = R.S_kVA * s.kodn;
+  R.S_inst = isAC ? R.S_base * (1 - s.motX + s.motX * s.motK) : R.S_base;
+  R.nsys = s.red === "2x100" ? 2 : (s.red === "n1" ? 2 : 1);
+  R.S1req = Math.max(R.S_base, R.S_inst) * s.kzap;
   R.ups_kVA = upsOf(R.S1req);
   R.marginEff = R.ups_kVA ? R.ups_kVA / R.S_kVA : null;
-  R.I_out = isAC ? R.ups_kVA * 1000 / 230 : R.ups_kVA * 1000 / s.udc; // ном. ток выхода 1-й системы (ВA/В)
-  R.I_in = isAC ? R.ups_kVA * 1000 * 1.15 / 230 : R.ups_kVA * 1000 * 1.15 / s.udc; // вход с запасом на заряд
+  R.I_out = isAC ? R.ups_kVA * 1000 / 230 : R.ups_kVA * 1000 / s.udc;
+  R.I_in = isAC ? R.ups_kVA * 1000 * 1.15 / 230 : R.ups_kVA * 1000 * 1.15 / s.udc;
 
-  /* --- 3.x АКБ по ГОСТ Р МЭК 60896-21-2013 (консервативно: ток в конце разряда) --- */
+  /* --- 3.x АКБ: ступенчатый график по ГОСТ Р МЭК 60896-21-2013 --- */
   R.warn = [];
-  const PbatW = s.P * 1000 * s.kodn / (isAC ? s.eff : 1);   // потребляемая от батарей мощность, Вт
-  R.NcellsMin = isAC ? NaN : Math.ceil(s.udc * 0.9 / s.uend); // ТУ DC: U ≥ 0,9·Uном при Uкон
+  const eff = isAC ? s.eff : 1;
+  const list = [{ name: "Базовая (неснимаемая)", p: s.P, t: s.tmin }];
+  if (s.grpOn) s.grps.forEach(g => list.push({ name: g.name, p: g.p, t: g.t }));
+  R.loadList = list;
+  const TK = [...new Set(list.map(x => x.t).filter(x => x > 0))].sort((a, b2) => a - b2);
+  const segs = [];
+  let t0 = 0;
+  for (const tk of TK) {
+    const pkW = list.filter(x => x.t >= tk).reduce((a2, x) => a2 + x.p, 0) * s.kodn / eff;
+    if (tk > t0) segs.push({ t0, t1: tk, dt: tk - t0, pkW });
+    t0 = tk;
+  }
+  R.Tend = TK.length ? TK[TK.length - 1] : s.tmin;
+  R.checkPts = TK; R.segs = segs;
+  R.NcellsMin = isAC ? NaN : Math.ceil(s.udc * 0.9 / s.uend);
   let N = isAC ? Math.ceil(s.udc / 2) : Math.max(Math.ceil(s.udc / 2), R.NcellsMin);
   R.Ncells = N;
-  R.PbatW = PbatW;
-  R.Kt = ktOf(s.tmin, s.uend);
-  R.I_max = PbatW / (N * s.uend);                             // А, худший случай (конец разряда)
-  R.C_req = R.I_max * (s.tmin / 60) / R.Kt;                   // А·ч, приведённые к C10 при 20 °C
-  const alpha = ALPHA_TEMP[s.tmin <= 120 ? "short" : "long"];
-  R.alpha = alpha; R.Ktemp = 1 + alpha * (s.temp - 20);       // температурная поправка
-  R.Kaging = TU_REQS.agingK;                               // +20 % на старение (п.5.6.1.32 ТУ)
-  R.C_corr = R.C_req / R.Ktemp * R.Kaging;                    // требуемая ёмкость на систему, А·ч C10
+  R.I_max = segs.length ? segs[0].pkW * 1000 / (N * s.uend) : 0;
+  const segEnd = segs.length ? segs[segs.length - 1].t1 : 0;
+  const tailP = segs.length ? segs[segs.length - 1].pkW : 0;
+  const cumAt = (T) => { // отданные А·ч к моменту T (после последней ступени — последней мощностью)
+    let ahc = 0;
+    for (const sg of segs) { if (T <= sg.t0) break; const dt = Math.min(T, sg.t1) - sg.t0; ahc += sg.pkW * 1000 / (N * s.uend) * dt / 60; }
+    if (T > segEnd) ahc += tailP * 1000 / (N * s.uend) * (T - segEnd) / 60;
+    return ahc;
+  };
+  R.C_req = 0; let critT = s.tmin;
+  for (const tp of R.checkPts) { const c = cumAt(tp) / ktOf(tp, s.uend); if (c > R.C_req) { R.C_req = c; critT = tp; } }
+  if (!isFinite(R.C_req) || R.C_req <= 0) { R.C_req = R.I_max * (s.tmin / 60) / ktOf(s.tmin, s.uend); critT = s.tmin; }
+  R.Kt = ktOf(critT, s.uend); R.critT = critT; R.cumAt = cumAt;
+  R.PbatW = segs.length ? segs[0].pkW * 1000 : 0;
+  const alpha = ALPHA_TEMP[critT <= 120 ? "short" : "long"];
+  R.alpha = alpha; R.Ktemp = 1 + alpha * (s.temp - 20);
+  R.Kaging = TU_REQS.agingK;
+  R.C_corr = R.C_req / R.Ktemp * R.Kaging;
 
   /* выбор/учёт батареи */
   let bat;
   if (s.batMode === "auto") {
     let best = null;
-    for (const b of BATTERIES) {
-      const cand = evalBattery(b, R, isAC);
+    for (const b2 of BATTERIES) {
+      const cand = evalBattery(b2, R);
       if (!cand) continue;
       const score = (cand.b.life >= TU_REQS.lifeYears ? 0 : 1e6) + cand.util;
       if (!best || score < best.score) best = { ...cand, score };
     }
     bat = best || null;
   } else {
-    const b = { id: "manual", name: "АКБ (ручной ввод)", V: s.batV || 12, Ah: s.batAh || 100,
+    const b2 = { id: "manual", name: "АКБ (ручной ввод)", V: s.batV || 12, Ah: s.batAh || 100,
       cells6: (s.batV || 12) >= 12, mass: +(0.28 * (s.batAh || 100) * (s.batV || 12) / 12).toFixed(1),
       L: 513, W: 240, H: 225, life: s.batLife, vrla: true, note: "параметры — оценка пользователя" };
-    bat = evalBattery(b, R, isAC);
+    bat = evalBattery(b2, R);
   }
   R.bat = bat;
   if (bat) {
-    R.NcellsBat = bat.NcellsBat;                              // элементов/блоков последовательно с учётом конструкции АКБ
-    R.C_bank = bat.n * bat.b.Ah;                              // фактическая ёмкость на систему, А·ч
+    R.NcellsBat = bat.NcellsBat;
+    R.C_bank = bat.n * bat.b.Ah;
     R.t_real = realAutonomy(R, bat);
-    R.cellsTotal = R.NcellsBat * bat.n * R.nsys;              // всего элементов по всем системам
-    R.massCell = R.NcellsBat > 0 ? (bat.b.cells6 ? bat.b.mass / 6 : bat.b.mass) : 0; // кг/элемент
+    R.cellsTotal = R.NcellsBat * bat.n * R.nsys;
+    R.massCell = bat.b.cells6 ? bat.b.mass / 6 : bat.b.mass;
     R.massBatt = R.cellsTotal * R.massCell;
-    if (!isAC && bat.b.cells6 && R.NcellsBat * 2 > s.udc * 1.12)
+    if (!isAC && bat.b.cells6 && R.NcellsBat > 0 && R.NcellsBat * 2 > s.udc * 1.12)
       R.warn.push(`Для сети ${s.udc} В нежелательны 12-В блоки: ${R.NcellsBat / 6}×12 В = ${R.NcellsBat / 6 * 12} В вне допуска ±10 %. Рекомендуем 2-В моноблоки (см. базу).`);
-    if (R.t_real < s.tmin) R.warn.push(`Фактическая автономия ${f(R.t_real, 0)} мин < требуемой — проверьте подбор.`);
+    if (R.t_real < R.Tend - 0.5) R.warn.push(`Фактическая предельная автономия ${f(R.t_real, 0)} мин < требуемой ${f(R.Tend, 0)} мин — увеличьте ёмкость АКБ.`);
+    if (s.grpOn) {
+      const miss = R.loadList.filter(g => R.t_real < g.t - 0.5).map(g => `${g.name} (${f(g.t, 0)} мин)`);
+      if (miss.length) R.warn.push("Время автономии НЕ выдержано группами: " + miss.join(", "));
+      else R.warn.push("Все группы нагрузок по времени автономии обеспечены ✓");
+    }
   } else R.warn.push("АКБ не подобрана: увеличьте базу или введите параметры вручную.");
 
   /* --- 4.x Стеллажи и нагрузка на пол --- */
@@ -125,32 +163,28 @@ function calc(s) {
 
   /* --- зарядное устройство, кабели, автоматы --- */
   R.C_total = bat ? R.C_bank * R.nsys : 0;
-  R.I_chg = PbatW / s.udc / s.chgEff + (R.C_bank || 0) / 10; // ТУ п.5.7: ток нагрузки + 10-часовой дозаряд
+  R.I_chg = R.PbatW / s.udc / s.chgEff + (R.C_bank || 0) / 10;
   R.qf_chg = breakerOf(R.I_chg * 1.25);
-  R.s_bat_cable = Math.max(cableOf(R.I_max * 1.25).s, sminForDU(R.I_max, s)); // по ПУЭ: I доп. и ΔU ≤2 %
+  R.s_bat_cable = Math.max(cableOf(R.I_max * 1.25).s, sminForDU(R.I_max, s));
   R.qf_bat = breakerOf(R.I_max * 1.25);
   R.s_in_cable = cableOf(R.I_in * 1.25).s;
   R.qf_in = breakerOf(R.I_in * 1.25);
   return R;
 }
-function ceilDiv(a, b) { return Math.ceil(a / b); }
 function sminForDU(I, s) { const need = 2 * 0.0175 * s.cableLen * I / (0.02 * s.udc); return cableOf(need).s; }
 function evalBattery(b, R) {
   if (!b || b.V <= 0 || b.Ah <= 0) return null;
-  const Nser = b.cells6 ? Math.ceil(R.Ncells / 6) : R.Ncells; // последовательно штук
-  const NcellsBat = b.cells6 ? Nser * 6 : Nser;                // всего элементов в системе
-  const n = Math.max(1, Math.ceil(R.C_corr / b.Ah));           // параллельных цепочек на систему
+  const Nser = b.cells6 ? Math.ceil(R.Ncells / 6) : R.Ncells;
+  const NcellsBat = b.cells6 ? Nser * 6 : Nser;
+  const n = Math.max(1, Math.ceil(R.C_corr / b.Ah));
   const util = (n * b.Ah) / R.C_corr;
   return { b, n, util, Nser, NcellsBat };
 }
 function realAutonomy(R, bat) {
-  const C = bat.n * bat.b.Ah * R.Ktemp / R.Kaging;             // располагаемая ёмкость за вычетом старения/Т°
-  let lo = 1, hi = 2880;
-  for (let i = 0; i < 40; i++) {
-    const mid = (lo + hi) / 2;
-    const Cneed = R.I_max * (mid / 60) / ktOf(mid, R.s.uend);
-    if (Cneed <= C) lo = mid; else hi = mid;
-  }
+  const Ccap = bat.n * bat.b.Ah * R.Ktemp / R.Kaging;
+  const reqAt = (T) => (R.cumAt ? R.cumAt(T) : R.I_max * (T / 60)) / ktOf(T, R.s.uend);
+  let lo = 1, hi = 5760;
+  for (let i = 0; i < 42; i++) { const mid = (lo + hi) / 2; if (reqAt(mid) <= Ccap) lo = mid; else hi = mid; }
   return lo;
 }
 function pickRack(R, bat, s) {
@@ -203,21 +237,29 @@ function renderBat(R) {
     metric("Ток макс. разряда", f(R.I_max, 0) + " А") +
     metric("Требуемая ёмкость (с коэфф.)", f(R.C_corr, 0) + " А·ч") +
     metric("Принято на систему", f(R.C_bank, 0) + " А·ч" + ` (${b.n} × ${b.b.Ah})`) +
-    metric("Автономия факт.", "≈ " + f(R.t_real, 0) + " мин", R.t_real >= s.tmin ? "good" : "bad") +
+    metric("Автономия предельная", "≥ " + f(R.Tend, 0) + " мин · факт. ≈ " + f(R.t_real, 0) + " мин", R.t_real >= R.Tend - 0.5 ? "good" : "bad") +
     metric("Элементов всего", f(R.cellsTotal, 0) + " шт", "") : "";
+  let cum = 0;
+  const rows = (R.segs || []).map((g, i) => {
+    cum += g.pkW * 1000 / (R.Ncells * s.uend) * g.dt / 60;
+    const kt = ktOf(g.t1, s.uend);
+    return `<tr><td>${i + 1}</td><td>${g.t0}…${g.t1}</td><td>${f(g.pkW, 1)}</td><td>${f(g.pkW * 1000 / (R.Ncells * s.uend), 0)}</td>
+      <td>${f(cum, 1)}</td><td>${f(kt, 2)}</td><td><b>${f(cum / kt, 0)}</b></td><td class="note">${R.loadList.filter(x => x.t >= g.t1).map(x => x.name).join("; ")}</td></tr>`;
+  }).join("");
+  const grpVerdict = (R.loadList || []).map(g => `<li>${g.name} — ${f(g.p, 1)} кВт · ${f(g.t, 0)} мин — <b class="${(R.t_real || 0) >= g.t - 0.5 ? "ok" : "bad"}">${(R.t_real || 0) >= g.t - 0.5 ? "✓ обеспечено" : "✗ НЕ обеспечено"}</b></li>`).join("");
   const fml = [
     `N эл. = ⌈U шины / 2 В⌉${s.type === "dc" ? ` (и ≥ 0,9·Uном/U кон = ${f(R.NcellsMin, 0)} по ТУ)` : ""} = ${R.Ncells} эл.`,
-    `I макс = P бат / (N · U кон) = ${f(R.PbatW, 0)} Вт / (${R.Ncells} · ${f(s.uend)}) = ${f(R.I_max, 1)} А`,
-    `C треб. = I макс · t / K t = ${f(R.I_max, 1)} · ${f(s.tmin / 60, 2)} ч / ${f(R.Kt, 2)} = ${f(R.C_req, 0)} А·ч (K t — по разрядной характеристике ГОСТ Р МЭК 60896-21, t = ${f(s.tmin, 0)} мин, U кон = ${f(s.uend)} В/эл)`,
-    `K T° = 1 + α·(T − 20 °C) = 1 + ${f(R.alpha, 3)}·(${f(s.temp, 0)} − 20) = ${f(R.Ktemp, 3)}; K старения = ${f(R.Kaging, 2)} (20 % по ТУ п.5.6.1.32)`,
+    `Ступенчатый график (критическая точка — максимум приведённой ёмкости, t = ${f(R.critT, 0)} мин):` +
+    `<table><tr><th>№</th><th>интервал, мин</th><th>P на АКБ, кВт</th><th>I, А</th><th>Σ А·ч</th><th>K t(t)</th><th>C треб., А·ч</th><th>В работе</th></tr>${rows}</table>`,
+    `C треб. = max Σ(I·Δt)/K t = ${f(R.C_req, 0)} А·ч (K t — по разрядной характеристике ГОСТ Р МЭК 60896-21 при U кон = ${f(s.uend)} В/эл.)`,
+    `K T° = 1 + α·(T − 20 °C) = ${f(R.Ktemp, 3)} (α = ${f(R.alpha, 3)} 1/°C, ${R.critT <= 120 ? "t ≤ 2 ч" : "t > 2 ч"}); K старения = ${f(R.Kaging, 2)} (20 % по ТУ п.5.6.1.32)`,
     `C расч. = C треб. / K T° · K стар = ${f(R.C_corr, 0)} А·ч на ОДНУ систему`,
-    b ? `Принято: ${b.b.name.trim()} — ${b.Nser} шт. последовательно (${b.NcellsBat} эл.), ${b.n} цеп. параллельно → ${f(R.C_bank, 0)} А·ч/система; фактическая автономия ≈ ${f(R.t_real, 0)} мин` : "АКБ не подобрана",
+    b ? `Принято: ${b.b.name.trim()} — ${b.Nser} шт. последовательно (${b.NcellsBat} эл.), ${b.n} цеп. параллельно → ${f(R.C_bank, 0)} А·ч/система; предельная автономия ≈ ${f(R.t_real, 0)} мин:<ul style="margin:.2rem 0 .2rem 1.2rem">${grpVerdict}</ul>` : "АКБ не подобрана",
     `Кабель АКБ→ИБP: I расч = 1,25·I макс = ${f(R.I_max * 1.25, 0)} А → ${R.s_bat_cable} мм² (медь, ПУЭ табл. 1.3.6 и ΔU ≤ 2 % при L = ${f(s.cableLen, 0)} м); QF батареи = ${R.qf_bat} А`,
-    `Выпрямитель/зарядное: I = P бат/(U·η) + C 10-ч = ${f(R.I_chg, 1)} А → номинал ${R.qf_chg} А, КПД ${f(s.chgEff * 100, 0)} % (ТУ ≥ 90 %)`
-  ].map(x => `<div class="f">${x}</div>`).join("");
+    `Выпрямитель/зарядное: I = P макс/(U·η) + C 10-ч = ${f(R.I_chg, 1)} А → номинал ${R.qf_chg} А, КПД ${f(s.chgEff * 100, 0)} % (ТУ ≥ 90 %)`
+  ].map(x => x.startsWith("<table>") ? x : `<div class="f">${x}</div>`).join("");
   $("out-bat").innerHTML = fml;
 }
-
 /* SECTION: render-racks-layout */
 function renderRacks(R) {
   const p = R.rackPlan, s = R.s, b = R.bat;
@@ -351,7 +393,7 @@ function symQF(P, x, y, pos, inf) { // автоматический выключ
   P.els.push({ t: "r", x: x + 4, y: y - 9, w: 7, h: 4.5, stroke: "#223344", sw: 0.9 });
   P.els.push({ t: "t", x: x + 15, y: y - 9, s: pos, size: 7.5, bold: true });
   const lines = Array.isArray(inf) ? inf : (inf ? String(inf).split("\n") : []);
-  lines.forEach((ln, i) => P.els.push({ t: "t", x: x + 15, y: y + i * 8, s: ln, size: 6.5, color: "#33465e" }));
+  lines.forEach((ln, i) => P.els.push({ t: "t", x: x + 15, y: y + 12 + i * 8, s: ln, size: 6.5, color: "#33465e" }));
 }
 function symSA(P, x, y, pos, inf) { // разъединитель: ножевой контакт, видимый разрыв (ГОСТ 2.710)
   P.els.push({ t: "l", x1: x, y1: y + 11, x2: x, y2: y + 4, sw: 1.6 });
@@ -361,17 +403,20 @@ function symSA(P, x, y, pos, inf) { // разъединитель: ножево�
   const lines = Array.isArray(inf) ? inf : (inf ? String(inf).split("\n") : []);
   lines.forEach((ln, i) => P.els.push({ t: "t", x: x + 12, y: y + 1 + i * 8, s: ln, size: 6.5, color: "#33465e" }));
 }
-function symBat(P, x, y, pos, inf) { // батарея: цепи элементов (ГОСТ 2.722): длинная + , короткая −
-  P.els.push({ t: "l", x1: x, y1: y - 40, x2: x, y2: y - 18, sw: 1.4 });
-  P.els.push({ t: "l", x1: x - 9, y1: y - 18, x2: x + 9, y2: y - 18, sw: 2.2 });   // +
-  P.els.push({ t: "l", x1: x - 4, y1: y - 14, x2: x + 4, y2: y - 14, sw: 1.4 });   // −
-  P.els.push({ t: "l", x1: x - 9, y1: y - 10, x2: x + 9, y2: y - 10, sw: 2.2 });
-  P.els.push({ t: "l", x1: x - 4, y1: y - 6, x2: x + 4, y2: y - 6, sw: 1.4 });
-  P.els.push({ t: "l", x1: x, y1: y - 6, x2: x, y2: y + 8, sw: 1.4 });
-  P.els.push({ t: "l", x1: x - 5, y1: y + 8, x2: x + 5, y2: y + 8, sw: 1.6 });     // рамка «батарея»
-  P.els.push({ t: "t", x: x - 26, y: y - 24, s: "+", size: 8 });
-  P.els.push({ t: "t", x: x + 13, y: y - 16, s: pos, size: 7.5, bold: true });
-  if (inf) inf.split("\n").forEach((ln, i) => P.els.push({ t: "t", x: x + 13, y: y - 6 + i * 9, s: ln, size: 6.5 }));
+function symBat(P, x, y, pos, inf) { // аккумуляторная батарея: цепочка элементов (ГОСТ 2.722)
+  P.els.push({ t: "l", x1: x, y1: y - 34, x2: x, y2: y - 26, sw: 1.4 });
+  for (let i = 0; i < 2; i++) {
+    P.els.push({ t: "l", x1: x - 9, y1: y - 22 + i * 8, x2: x + 9, y2: y - 22 + i * 8, sw: 2 });
+    P.els.push({ t: "l", x1: x - 3.5, y1: y - 18 + i * 8, x2: x + 3.5, y2: y - 18 + i * 8, sw: 1.4 });
+  }
+  P.els.push({ t: "l", x1: x - 6, y1: y + 5, x2: x + 6, y2: y + 5, sw: 1.8 });
+  P.els.push({ t: "l", x1: x - 4, y1: y + 9, x2: x + 4, y2: y + 9, sw: 1.4 });
+  P.els.push({ t: "l", x1: x, y1: y + 5, x2: x, y2: y - 2 });
+  P.els.push({ t: "t", x: x - 14, y: y - 24, s: "+", size: 8 });
+  P.els.push({ t: "t", x: x - 14, y: y + 8, s: "\u2212", size: 8 });
+  P.els.push({ t: "t", x: x - 22, y: y - 34, s: pos, size: 8, bold: true, align: "end" });
+  const ls = Array.isArray(inf) ? inf : (inf ? String(inf).split("\n") : []);
+  ls.forEach((ln, i) => P.els.push({ t: "t", x: x + 25, y: y - 30 + i * 9, s: ln, size: 6.5, color: "#33465e" }));
 }
 function symSTP(P, x, y, pos, inf) { // статический переключатель: встречно-параллельные тиристоры (ГОСТ 2.747)
   P.els.push({ t: "l", x1: x, y1: y - 15, x2: x, y2: y - 8, sw: 1.4 });
@@ -380,13 +425,13 @@ function symSTP(P, x, y, pos, inf) { // статический переключ�
   P.els.push({ t: "l", x1: x - 6, y1: y - 4, x2: x + 6, y2: y - 4, sw: 1.3 });
   P.els.push({ t: "p", pts: [[x - 6, y - 5], [x + 6, y - 5], [x, y + 4]] });
   P.els.push({ t: "l", x1: x - 6, y1: y + 4, x2: x + 6, y2: y + 4, sw: 1.3 });
-  P.els.push({ t: "t", x: x + 11, y: y - 3, s: pos, size: 7.5, bold: true, color: "#7a3fd8" });
+  P.els.push({ t: "t", x: x + 40, y: y - 8, s: pos, size: 7.5, bold: true, color: "#7a3fd8" });
   const lines = Array.isArray(inf) ? inf : (inf ? String(inf).split("\n") : []);
-  lines.forEach((ln, i) => P.els.push({ t: "t", x: x + 11, y: y + 6 + i * 8, s: ln, size: 6.5, color: "#7a3fd8" }));
+  lines.forEach((ln, i) => P.els.push({ t: "t", x: x + 40, y: y + i * 8, s: ln, size: 6.5, color: "#7a3fd8" }));
 }
 function symConv(P, x, y, w, h, kind, pos, inf) { // преобразователь (ГОСТ 2.747/2.721)
   P.els.push({ t: "r", x: x - w / 2, y: y - h / 2, w, h, fill: "#f6faff", stroke: "#223344", sw: 1.4 });
-  const a = kind === "rec" ? ["~", "\u23D7"] : ["\u23D7", "~"]; // вход/выход
+  const a = kind === "rec" ? ["~", "\u2393"] : ["\u2393", "~"]; // вход/выход
   P.els.push({ t: "t", x: x - w / 2 + 14, y: y + 4, s: a[0], size: 12, align: "middle", bold: true });
   P.els.push({ t: "t", x: x + w / 2 - 14, y: y + 4, s: a[1], size: 12, align: "middle", bold: true });
   P.els.push({ t: "l", x1: x - 14, y1: y + 10, x2: x + 14, y2: y - 10, sw: 1.1 });
@@ -402,103 +447,125 @@ function box(P, x, y, w, h, text, sub, fill, posOut) {
   return { x, y, w, h };
 }
 function wire(P, pts, sw) { for (let i = 0; i < pts.length - 1; i++) P.els.push({ t: "l", x1: pts[i][0], y1: pts[i][1], x2: pts[i + 1][0], y2: pts[i + 1][1], sw: sw || 1.4 }); }
+function wEst(str, size) { return String(str).length * (size || 7) * 0.56; }
 function schemeAC(R) {
-  const s = R.s, P = { W: 1060, H: 700, els: [] };
+  const s = R.s, n = R.nsys, isRed = n > 1;
   const b = R.bat;
-  P.els.push({ t: "t", x: 20, y: 22, s: `Схема электрическая структурная. Источник бесперебойного питания переменного тока 2×100 % — ${s.proj}`, size: 11.5, bold: true });
-  P.els.push({ t: "t", x: 20, y: 38, s: `Выполнена по ГОСТ 2.702-2011, ГОСТ 2.701-2008; УГО — ГОСТ 2.7х серии ЕСКД. Байпас общий. Класс по ГОСТ IEC 62040-3-2024: VFI·SS·1·PF1 (2×100 %).`, size: 8 });
-  const xA = 250, xB = 600, xBy = 900, y0 = 56;
-  for (const [cx, nm, qfIn] of [[xA, "A", "QF1"], [xB, "B", "QF2"]]) {
-    P.els.push({ t: "t", x: cx - 90, y: y0 + 4, s: `Ввод ${nm}: сеть 3~/380 В, Iвх=${f(R.I_in, 0)} А`, size: 8 });
-    wire(P, [[cx, y0], [cx, y0 + 50]]);
-    symQF(P, cx, y0 + 46, qfIn, `${R.qf_in} А`);
-    wire(P, [[cx, y0 + 62], [cx, y0 + 92]]);
-    symConv(P, cx, y0 + 122, 150, 48, "rec", `VC-${nm}`, `Пит: 3~/380 В cos φ≥${f(TU_REQS.cospfMin)}\nU вых DC: ${s.udc} В · η=${f(s.chgEff * 100, 0)} % · ${f(R.I_chg, 0)} А`);
-    wire(P, [[cx, y0 + 146], [cx, y0 + 186]]);
-    /* шина DC接单: на уровне yDC */
-    const yDC = y0 + 186, bx = cx - 150;
-    wire(P, [[bx, yDC], [bx, yDC + 60]]);
-    symQF(P, bx, yDC + 62, `QF_${nm}`, `${R.qf_bat} А\nIрасч=${f(R.I_max * 1.25, 0)} А`);
-    wire(P, [[bx, yDC + 80], [bx, yDC + 128]]);
-    symSA(P, bx, yDC + 142, `SA_${nm}`, `${R.qf_bat} А\nвидимый разрыв`);
-    symBat(P, bx, yDC + 210, `GB_${nm}`, `${R.NcellsBat}×${b ? b.b.V : 2} В\n${f(R.C_bank || 0, 0)} А·ч (C10)\nIразр=${f(R.I_max, 0)} А\nt=${f(s.tmin, 0)} мин (≈${f(R.t_real || s.tmin, 0)})`);
-    wire(P, [[bx, yDC + 226], [bx, yDC + 252]]);
-    P.els.push({ t: "l", x1: bx - 7, y1: yDC + 252, x2: bx + 7, y2: yDC + 252, sw: 2.2 });
-    /* инвертор */
-    wire(P, [[cx, yDC], [cx, yDC + 26]]);
-    symConv(P, cx, yDC + 56, 150, 48, "inv", `NC-${nm}`, `U вх DC ${s.udc} В\nU вых 230 В ±1 % · 50 Гц ±1 Гц\nS ном ${R.ups_kVA} кВА · I вых ${f(R.I_out, 0)} А`);
-    wire(P, [[cx, yDC + 80], [cx, yDC + 150]]);
-    symSTP(P, cx, yDC + 168, `SF_${nm}`, `Iном=${f(R.I_out, 0)} А`);
-    wire(P, [[cx, yDC + 186], [cx, yDC + 222]]);
+  const vcInfo = [`3~/380 В —> ${s.udc} В DC, I зy ${f(R.I_chg, 0)} А`, `вых. 230 В ±1 %, 50 Гц ±1 Гц, S ${R.ups_kVA || "—"} кВА`],
+    gbInfo = [`${R.NcellsBat}×${b ? b.b.V : 2} В · ${f(R.C_bank || 0, 0)} А·ч (C10)`,
+      `I разр ${f(R.I_max, 0)} А · U кон ${f(s.uend)} В/эл`,
+      `t ступ.: ${R.loadList.map(g => `${f(g.p, 1)} кВт/${f(g.t, 0)} мин`).join(", ")}`];
+  const infoW = Math.max(wEst(vcInfo[0], 6.5), wEst(vcInfo[1], 6.5), wEst(gbInfo[2], 6.5), wEst(`S ${R.ups_kVA || "—"} кВА · I вых ${f(R.I_out, 0)} А`, 6.5));
+  const colStep = Math.max(360, infoW + 200);
+  const x0 = 210, yDC = 208, yOut = isRed ? 402 : 402;
+  const xE = x0 + (n - 1) * colStep;
+  const xBy = xE + colStep * 0.78;
+  const shnX = (x0 + (isRed ? xBy : xE + 60)) / 2 - 95;
+  const loads = R.loadList, loadBoxW = Math.max(270, 24 + Math.max(...loads.map(g => wEst(`Ф${g.name} · ${g.p} кВт · ${g.t} мин`, 6.8))));
+  const P = { W: Math.max(1060, xBy + (isRed ? 240 : 200), shnX + 120 + loadBoxW + 60), H: 500 + loads.length * 13 + 90, els: [] };
+  P.els.push({ t: "t", x: 20, y: 22, s: `Схема электрическая структурная. ИБП переменного тока${isRed ? " 2×100 %" : ""} — ${s.proj}`, size: 11.5, bold: true });
+  P.els.push({ t: "t", x: 20, y: 38, s: `ГОСТ 2.702-2011/2.701-2008; УГО — ГОСТ 2.7х ЕСКД. Класс VFI·SS·1·PF1 (ГОСТ IEC 62040-3-2024). Резервирование: ${isRed ? "2 системы × 100 %, байпас общий" : "1 система (без резерва)"}.`, size: 8 });
+  for (let i = 0; i < n; i++) {
+    const cx = x0 + i * colStep, nm = "AB"[i] || String(i + 1);
+    P.els.push({ t: "t", x: cx, y: 58, s: `Ввод ${nm}: 3~/380 В, I вх ${f(R.I_in, 0)} А`, size: 8, align: "middle" });
+    wire(P, [[cx, 64], [cx, 79]]); symQF(P, cx, 92, `QF${i * 2 + 1}`, `${R.qf_in} А`);
+    wire(P, [[cx, 106], [cx, 128]]);
+    symConv(P, cx, 150, 130, 44, "rec", `VC-${nm}`, vcInfo);
+    wire(P, [[cx, 172], [cx, yDC]]);
+    wire(P, [[cx, yDC], [cx, 240]]);
+    symConv(P, cx, 262, 130, 44, "inv", `NC-${nm}`, [`I вых ${f(R.I_out, 0)} А · η ≥ 92 %`, `косв. нагрузка ${f(s.P, 1)} кВт cos φ ${f(s.cos)}`]);
+    wire(P, [[cx, 284], [cx, 330]]);
+    symSTP(P, cx, 344, `SF-${nm}`, `I ном ${f(R.I_out, 0)} А`);
+    wire(P, [[cx, 358], [cx, yOut]]);
+    const bx = cx - 150;
+    wire(P, [[bx, yDC], [bx, 226]]);
+    symQF(P, bx, 240, `QF-${nm}`, [`${R.qf_bat} А`, `I расч ${f(R.I_max * 1.25, 0)} А`]);
+    wire(P, [[bx, 254], [bx, 276]]);
+    symSA(P, bx, 288, `SA-${nm}`, `${R.qf_bat} А`);
+    wire(P, [[bx, 294], [bx, 318]]);
+    symBat(P, bx, 352, `GB-${nm}`, gbInfo);
   }
-  const yDC0 = 242;
-  P.els.push({ t: "l", x1: 130, y1: yDC0, x2: 600 - 0, y2: yDC0, sw: 2.6 });
-  P.els.push({ t: "t", x: 380, y: yDC0 - 10, s: "Шина постоянного тока (звено DC) — 2×100 %", size: 8, align: "middle", bold: true });
-  P.els.push({ t: "l", x1: 130, y1: yDC0 + 6, x2: 130 - 8, y2: yDC0 + 6, sw: 2 }); // засечки конца шины
-  /* общий байпас */
-  P.els.push({ t: "t", x: xBy - 96, y: 60, s: "Резервная (байпасная) линия 3~/380 В", size: 8 });
-  wire(P, [[xBy, 66], [xBy, 110]]);
-  symQF(P, xBy, 126, "QF9", `${R.qf_in} А`);
-  wire(P, [[xBy, 144], [xBy, 420]]);
-  symSTP(P, xBy, 438, "SF9-байпас", "Iном=2·" + f(R.I_out, 0) + " А");
-  wire(P, [[xBy, 456], [xBy, 470], [660, 470]]);
-  /* шина вывода 230 В */
-  P.els.push({ t: "l", x1: 250, y1: 464, x2: 900, y2: 464, sw: 2.6 });
-  P.els.push({ t: "t", x: 762, y: 459, s: "Шина 230 В ±1 %, 50 Гц ±1 Гц (плавающая земля, ТУ п.5.2)", size: 8, align: "middle", bold: true });
-  /* ШСН */
-  const shn = box(P, 600 - 70, 484, 150, 40, "ШСН (ЩС) — щит собственных нужд", `выводов: 6…12; I лин. ≤ ${Math.ceil(R.I_out / 6)} А; QF отх.`);
-  wire(P, [[380, 464], [380, 504], [530, 504]]);
-  const ld = box(P, 830, 470, 130, 46, "Потребители AC", `P = ${f(s.P, 1)} кВт·cos φ ${f(s.cos)}\nTHD по IEEE 519 / ГОСТ IEC 62040-2`);
-  wire(P, [[680, 504], [830, 504], [830, 496]]);
-  /* цепи управления */
-  P.els.push({ t: "l", x1: 90, y1: 660, x2: 980, y2: 660, dash: "5 3", color: "#7a3fd8", sw: 1.1 });
-  P.els.push({ t: "t", x: 94, y: 653, s: "Цепи управления и сигнализации: тревожные «сухие контакты», RS-485 (Modbus RTU), контроль изоляции, датчики T° (компенсация заряда), ОПС", size: 7.5, color: "#7a3fd8" });
-  P.els.push({ t: "t", x: 20, y: 692, s: `Позиционные обозначения: QF — автоматический выключатель; SA — разъединитель; GB — батарея; VC/NC — выпрямитель/инвертор; SF — статический переключатель. Все параметры — из разделов 2–4 расчёта.`, size: 7, color: "#5a6a7e" });
+  for (let i = 0; i < n; i++) { P.els.push({ t: "n", x: x0 + i * colStep, y: yDC }, { t: "n", x: x0 + i * colStep - 150, y: yDC }); }
+  P.els.push({ t: "l", x1: x0 - 150, y1: yDC, x2: xE + 20, y2: yDC, sw: 2.6 });
+  P.els.push({ t: "t", x: (x0 + xE) / 2 - 65, y: yDC - 8, s: "Шина постоянного тока (звено DC)", size: 8.5, bold: true, align: "middle" });
+  const shnEnd = isRed ? xBy : (xE + 20);
+  if (isRed) {
+    P.els.push({ t: "t", x: xBy - 12, y: 58, s: "Резервная (байпасная) линия 3~/380 В", size: 8, align: "middle" });
+    wire(P, [[xBy, 64], [xBy, 92]]);
+    symQF(P, xBy, 106, "QF9", `${R.qf_in} А`);
+    wire(P, [[xBy, 120], [xBy, 330]]);
+    symSTP(P, xBy, 344, "SF9", `I ном ${f(R.I_out, 0)} А`);
+    wire(P, [[xBy, 358], [xBy, yOut]]);
+    P.els.push({ t: "n", x: xBy, y: yOut });
+  }
+  P.els.push({ t: "l", x1: x0, y1: yOut, x2: shnEnd, y2: yOut, sw: 2.6 });
+  for (let i = 0; i < n; i++) P.els.push({ t: "n", x: x0 + i * colStep, y: yOut });
+  P.els.push({ t: "t", x: Math.min(xE + 90, shnEnd - 40), y: yOut - 7, s: "Шина 230 В ±1 %, 50 Гц ±1 Гц — плавающая нейтраль (ТУ п.5.2)", size: 8.5, align: "middle", bold: true });
+  box(P, shnX, 430, 210, 42, "ШСН (ЩС) — щит собств. нужд", `вводной QF ${R.qf_in} А · I ном ${f(R.I_out, 0)} А`);
+  wire(P, [[shnX + 100, yOut], [shnX + 100, 430]]);
+  P.els.push({ t: "n", x: shnX + 100, y: yOut });
+  /* фидеры нагрузок с разным временем автономии */
+  const ly = 502;
+  box(P, shnX + 230, ly - 30, loadBoxW, 26 + loads.length * 13, "Фидеры ИБП (группы нагрузки)", null);
+  wire(P, [[shnX + 210, 451], [shnX + 230, 451], [shnX + 230, ly - 4]], 1.2);
+  loads.forEach((g, j) => P.els.push({ t: "t", x: shnX + 240, y: ly + 16 + j * 13, s: `Ф${j + 1} — ${g.name} — ${f(g.p, 1)} кВт — t = ${f(g.t, 0)} мин`, size: 6.8 }));
+  P.els.push({ t: "l", x1: 90, y1: P.H - 34, x2: P.W - 40, y2: P.H - 34, dash: "5 3", color: "#7a3fd8", sw: 1.1 });
+  P.els.push({ t: "t", x: 94, y: P.H - 41, s: "Цепи управления и сигнализации: RS-485/Modbus RTU, «сухие контакты», контроль изоляции, датчики T° (компенсация заряда), ОПС", size: 7.5, color: "#7a3fd8" });
+  P.els.push({ t: "t", x: 20, y: P.H - 12, s: "QF — автоматический выключатель (ГОСТ 2.710/2.755); SA — разъединитель; GB — батарея (ГОСТ 2.722); VC/NC — выпрямитель/инвертор (ГОСТ 2.747); SF — статический переключатель. Параметры — из разделов 2–4.", size: 7, color: "#5a6a7e" });
   return P;
 }
 function schemeDC(R) {
-  const s = R.s, P = { W: 1060, H: 640, els: [] };
-  const b = R.bat;
-  P.els.push({ t: "t", x: 20, y: 22, s: `Схема электрическая структурная. Источник бесперебойного питания постоянного тока 2×100 % — ${s.proj}`, size: 11.5, bold: true });
-  P.els.push({ t: "t", x: 20, y: 38, s: `ГОСТ 2.702-2011, ГОСТ 2.701-2008; УГО — ГОСТ 2.7х ЕСКД. Характеристики ИБП DC — по ГОСТ IEC 62040-5-3-2024; эксплуатация — ГОСТ IEC 62040-1-2024, ЭМС — ГОСТ IEC 62040-2.`, size: 8 });
-  const xA = 270, xB = 640, yDC = 200;
-  for (const [cx, nm, qfIn, qfBat] of [[xA, "A", "QF1", "QF3"], [xB, "B", "QF2", "QF4"]]) {
-    P.els.push({ t: "t", x: cx - 90, y: 60, s: `Ввод ${nm}: сеть 3~/380 В`, size: 8 });
-    wire(P, [[cx, 66], [cx, 96]]);
-    symQF(P, cx, 112, qfIn, `${R.qf_in} А`);
-    wire(P, [[cx, 130], [cx, 160]]);
-    symConv(P, cx, 186, 160, 52, "rec", `AVR_${nm}`, `3~/380 В → ${s.udc} В DC ±10 %\nI макс ${f(R.I_chg, 0)} А (нагрузка + 10-ч. заряд)\nη = ${f(s.chgEff * 100, 0)} % (ТУ ≥ 90 %)` );
-    wire(P, [[cx - 60, yDC + 14], [cx - 60, yDC + 60]]);
-    symQF(P, cx - 60, yDC + 76, qfBat, `${R.qf_bat} А\nIрасч 1,25·${f(R.I_max, 0)} А`);
-    wire(P, [[cx - 60, yDC + 94], [cx - 60, 340]]);
-    symSA(P, cx + 70, yDC + 76, `SA_${nm}`, `${R.qf_bat} А`);
-    wire(P, [[cx - 60, yDC + 94], [cx + 70, yDC + 94], [cx + 70, yDC + 94]]);
-    symBat(P, cx + 70, 350, `GB_${nm}`, `${R.NcellsBat}×2 В\n${f(R.C_bank || 0, 0)} А·ч · VRLA\nIразр=${f(R.I_max, 0)} А · t=${f(s.tmin, 0)} мин\n(факт ≈${f(R.t_real || s.tmin, 0)} мин)`);
-    wire(P, [[cx + 70, 366], [cx + 70, 388]]);
-    P.els.push({ t: "l", x1: cx + 62, y1: 388, x2: cx + 78, y2: 388, sw: 2.2 });
+  const s = R.s, n = R.nsys, b = R.bat;
+  const avrInfo = [`3~/380 В —> ${s.udc} В ±10 %, ${R.ups_kVA || f(s.P, 0)} кВт`, `I ${f(R.I_chg, 0)} А · η ${f(s.chgEff * 100, 0)} % · 2×100 %`];
+  const gbInfo = [`${R.NcellsBat}×2 В · ${f(R.C_bank || 0, 0)} А·ч · VRLA`,
+    `I разр ${f(R.I_max, 0)} А · U кон ${f(s.uend)} В`,
+    `t ступ.: ${R.loadList.map(g => `${f(g.p, 1)} кВт/${f(g.t, 0)} мин`).join("; ")}`];
+  const infoW = Math.max(wEst(avrInfo[0], 6.5), wEst(gbInfo[2], 6.5));
+  const colStep = Math.max(360, infoW + 230);
+  const x0 = 250, yB = 168;
+  const xE = x0 + (n - 1) * colStep;
+  const loads = R.loadList, loadBoxW = Math.max(280, 24 + Math.max(...loads.map(g => wEst(`Ф${g.name} · ${g.p} кВт · ${g.t} мин`, 6.8))));
+  const P = { W: Math.max(1060, xE + colStep * 0.6 + 240, xE + 240), H: 470 + loads.length * 13 + 100, els: [] };
+  P.els.push({ t: "t", x: 20, y: 22, s: `Схема электрическая структурная. ИБП постоянного тока 2×100 % — ${s.proj}`, size: 11.5, bold: true });
+  P.els.push({ t: "t", x: 20, y: 38, s: `ГОСТ IEC 62040-5-3-2024 (UPS DC), безопасность — ГОСТ IEC 62040-1-2024, ЭМС — ГОСТ IEC 62040-2. ГОСТ 2.702-2011; УГО — ГОСТ 2.7х ЕСКД. Систем: ${n}.`, size: 8 });
+  for (let i = 0; i < n; i++) {
+    const cx = x0 + i * colStep, nm = "AB"[i] || String(i + 1);
+    P.els.push({ t: "t", x: cx, y: 60, s: `Ввод ${nm}: сеть 3~/380 В`, size: 8, align: "middle" });
+    wire(P, [[cx, 66], [cx, 78]]); symQF(P, cx, 92, `QF${i + 1}`, `${R.qf_in} А`);
+    wire(P, [[cx, 106], [cx, 128]]);
+    symConv(P, cx, 150, 150, 44, "rec", `VC-${nm}`, avrInfo);
+    wire(P, [[cx, 172], [cx, yB]]);
+    const bx = cx - 120;
+    wire(P, [[bx, yB], [bx, 196]]);
+    symQF(P, bx, 210, `QF${i + 3}`, [`${R.qf_bat} А`, `I расч ${f(R.I_max * 1.25, 0)} А`]);
+    wire(P, [[bx, 224], [bx, 252]]);
+    symSA(P, bx, 266, `SA-${nm}`, `${R.qf_bat} А`);
+    wire(P, [[bx, 276], [bx, 320]]);
+    symBat(P, bx, 356, `GB-${nm}`, gbInfo);
+    P.els.push({ t: "n", x: bx, y: yB }, { t: "n", x: cx, y: yB }, { t: "n", x: cx + 88, y: yB });
     /* шпн */
+    box(P, cx - 80, 420, 160, 40, `ШПН-${nm} ${s.udc} В`, `QF отх. ≤ ${Math.ceil(R.I_out / 6)} А`);
+    wire(P, [[cx + 88, yB], [cx + 88, 400], [cx, 400], [cx, 420]]);
   }
-  /* шины A и B раздельные (сегрегация ТУ п.5.2) */
-  P.els.push({ t: "l", x1: xA - 120, y1: yDC + 4, x2: xA + 130, y2: yDC + 4, sw: 2.6 });
-  P.els.push({ t: "l", x1: xB - 120, y1: yDC + 4, x2: xB + 130, y2: yDC + 4, sw: 2.6 });
-  P.els.push({ t: "t", x: xA, y: yDC - 6, s: `Шина DC-A ${s.udc} В`, size: 8, align: "middle", bold: true });
-  P.els.push({ t: "t", x: xB, y: yDC - 6, s: `Шина DC-B ${s.udc} В`, size: 8, align: "middle", bold: true });
-  P.els.push({ t: "l", x1: xA + 140, y1: yDC - 14, x2: xB - 130, y2: yDC - 14, dash: "6 3", color: "#b26a00" });
-  P.els.push({ t: "t", x: (xA + xB) / 2, y: yDC - 20, s: "сегрегация: разные шкафы и стеллажи (ТУ п.5.2)", align: "middle", size: 7, color: "#b26a00" });
-  const shnA = box(P, xA - 90, 412, 170, 40, `ШПН-A ${s.udc} В`, `I макс линии ${f(R.I_out / 4, 0)} А`);
-  const shnB = box(P, xB + 130 - 170, 412, 170, 40, `ШПН-B ${s.udc} В`, `I макс линии ${f(R.I_out / 4, 0)} А`);
-  wire(P, [[xA, yDC + 4], [xA, 412]]);
-  wire(P, [[xB, yDC + 4], [xB, 412]]);
-  const ld = box(P, 380, 508, 300, 46, "Потребители ПС (двухлучевое питание)", `P = ${f(s.P, 1)} кВт; каждый фидер от A и B;\nвводы 2P, ${breakerOf(R.I_out / 4)} А`);
-  wire(P, [[xA, 452], [xA, 486], [430, 486], [430, 508]], 1);
-  wire(P, [[xB, 452], [xB, 496], [630, 496], [630, 508]], 1);
-  box(P, 770, 430, 220, 40, "Прибор контроля изоляции (PVM)", `${s.udc} В, плавающая шина; авария → АСУ`);
-  wire(P, [[850, 430], [850, yDC + 4]], 1);
-  P.els.push({ t: "l", x1: 90, y1: 608, x2: 990, y2: 608, dash: "5 3", color: "#7a3fd8", sw: 1.1 });
-  P.els.push({ t: "t", x: 94, y: 601, s: "Цепи управления и сигнализации: RS-485/Modbus, «сухие контакты», датчики T° у АКБ (температурная компенсация заряда по ТУ п.5.6.1.32)", size: 7.5, color: "#7a3fd8" });
-  P.els.push({ t: "t", x: 20, y: 632, s: "Пояснения: AVR — выпрямитель/зарядное; GB — батарея; QF — автомат; SA — разъединитель; ШПН — щит постоянного напряжения. Параметры — из расчёта.", size: 7, color: "#5a6a7e" });
+  for (let i = 0; i < n; i++) {
+    const cx = x0 + i * colStep;
+    P.els.push({ t: "l", x1: cx - 140, y1: yB, x2: cx + 112, y2: yB, sw: 2.6 });
+    P.els.push({ t: "t", x: cx - 14, y: yB - 7, s: `Шина DC-${"AB"[i] || i + 1} ${s.udc} В`, size: 8, align: "middle", bold: true });
+  }
+  if (n > 1) P.els.push({ t: "t", x: 20, y: P.H - 66, s: "Системы A и B разнесены конструктивно: раздельные шкафы, шины и стеллажи (ТУ п.5.2).", size: 7.5, color: "#b26a00" });
+  const ly = 500;
+  box(P, x0 - 150, ly - 14, loadBoxW, 30 + loads.length * 13, "Фидеры ШПН (группы нагрузки с разным t)", null);
+  wire(P, [[x0 - 80, 460], [x0 - 80, ly - 14]], 1.2);
+  loads.forEach((g, j) => P.els.push({ t: "t", x: x0 - 140, y: ly + 18 + j * 13, s: `Ф${j + 1} — ${g.name} — ${f(g.p, 1)} кВт — t = ${f(g.t, 0)} мин`, size: 6.8 }));
+  box(P, xE - 120, P.H - 210, 210, 40, "Контроль изоляции", `${s.udc} В, плавающая шина`);
+  wire(P, [[xE - 15, P.H - 210], [xE - 15, yB]], 1);
+  P.els.push({ t: "n", x: xE - 15, y: yB });
+  P.els.push({ t: "l", x1: 90, y1: P.H - 34, x2: P.W - 40, y2: P.H - 34, dash: "5 3", color: "#7a3fd8", sw: 1.1 });
+  P.els.push({ t: "t", x: 94, y: P.H - 41, s: "Цепи управления и сигнализации: «сухие контакты», RS-485, датчики T° у АКБ (компенсация заряда, ТУ п.5.6.1.32)", size: 7.5, color: "#7a3fd8" });
+  P.els.push({ t: "t", x: 20, y: P.H - 12, s: "VC — выпрямитель/зарядное; GB — батарея (ГОСТ 2.722); QF — автомат; SA — разъединитель; ШПН — щит постоянного напряжения. Параметры — из расчёта.", size: 7, color: "#5a6a7e" });
   return P;
 }
+
 function currentScheme(R) { return R.s.type === "ac" ? schemeAC(R) : schemeDC(R); }
 
 /* SECTION: checks-spec-method */
@@ -519,7 +586,8 @@ function renderChecks(R) {
     ["Конечное напряжение разрядки не ниже паспортного", "ТУ п.5.6.1.32", `${f(s.uend)} В/эл`, s.uend >= 1.70],
     ["Степень защиты оболочек не ниже IP42", "ТУ п.5.4.1.5", s.ip, ipNum >= Y.ip],
     ["Температура в помещении АКБ 20…25 °C (проектное)", "ТУ / пояснительная записка", `${f(s.temp, 0)} °C`, s.temp >= Y.tempOk[0] && s.temp <= Y.tempOk[1]],
-    ["Время автономии выдержано", "Исходные данные", `≈ ${f(R.t_real || 0, 0)} мин ≥ ${f(s.tmin, 0)} мин`, (R.t_real || 0) >= s.tmin - 0.5],
+    [(s.grpOn ? "Ступенчатый график автономии выдержан (все группы)" : "Время автономии выдержано"), "Исходные данные, ГОСТ Р МЭК 60896-21",
+      `предельно ≈ ${f(R.t_real || 0, 0)} мин ≥ требуемого ${f(R.Tend || s.tmin, 0)} мин`, (R.t_real || 0) >= (R.Tend || s.tmin) - 0.5],
     ["Нагрузка на пол не выше допуска помещения", "ГОСТ Р МЭК 62485-2, СП", R.rackPlan ? `${f(R.rackPlan.floor, 0)} ≤ ${f(s.floor, 0)} кг/м²` : "—", R.rackPlan ? R.rackPlan.floor <= s.floor : false],
     ["Стеллажи рассчитаны на сейсмичность площадки", "ТУ п.5.4.1.22", `${f(s.seismic, 0)} баллов`, s.seismic <= 7],
     [isAC ? "Класс и эксплуатационные характеристики UPS по ГОСТ IEC 62040-3-2024" : "UPS постоянного тока: характеристики и испытания по ГОСТ IEC 62040-5-3-2024",
@@ -584,6 +652,7 @@ function renderMethod(R) {
   <div class="f">I макс = P бат / (N эл · U кон)</div>
   <div class="f">C треб = I макс · (t/60) / K t , где K t — использование ёмкости при времени t и конечном напряжении (типовые разрядные характеристики VRLA);</div>
   <div class="f">C расч = C треб / (1 + α·(T−20)) · 1,2 , где α = 0,006 1/°C (t ≤ 2 ч) / 0,004 (t > 2 ч) — температурный коэффициент ГОСТ Р МЭК 60896-21; 1,2 — компенсация старения 20 % (ТУ п.5.6.1.32, 5.7.1.26).</div>
+  <p><b>Ступенчатый график (группы с разным временем):</b> по каждой границе T считаем отданные А·ч ∑I·Δt и приводим к C10 делением на K<sub>t</sub>(T); требуемая ёмкость — максимум по всем T. После отключения всех ступеней расчёт продолжается последней ступенью (фактическое «время до отключения»).</p>
   <p><b>Зарядное устройство (ТУ п.5.7):</b> I ЗУ = P бат/(U·η) + C 10ч ; КПД ≥ 90 %.</p>
   <p><b>Кабели:</b> сечение по ПУЭ (длительный допуск, табл. 1.3.6) и потере напряжения ΔU ≤ 2 % для ответственных цепей; батареи — медь, наконечники пластины/болты по ТУ п.5.6.1.31.</p>
   <p><b>Стеллажи:</b> груз на 1 стеллаж и удельная нагрузка на пол (масса/пятно) относительно допускаемого значения помещения; при сейсмичности ≥8 баллов — расчёт по СП 14.13330; зазоры между АКБ 10–20 мм и проходы обслуживания 1,0 м по ГОСТ Р МЭК 62485-2.</p>
@@ -608,7 +677,8 @@ function txtNote(R) {
     .forEach(([k, v]) => L.push(`  ${k}: ${v}`));
   L.push("", "2. РАСЧЁТ ИБП");
   L.push(`  S расч = ${f(R.S_base)} кВА; пусковая = ${f(R.S_inst)} кВА; на систему = ${f(R.S1req)}; принято ${R.nsys}×${R.ups_kVA} кВА (запас ${f((R.marginEff - 1) * 100, 0)} %)`);
-  L.push("", "3. РАСЧЁТ АКБ (ГОСТ Р МЭК 60896-21)");
+  L.push("", "3. РАСЧЁТ АКБ (ГОСТ Р МЭК 60896-21)" + (s.grpOn ? " — ступенчатый график" : ""));
+  if (s.grpOn && R.segs) { L.push("  Ступенчатый график (P на шинах АКБ):"); R.segs.forEach((g2, i2) => L.push(`    Ступень ${i2 + 1}: ${g2.t0}…${g2.t1} мин — ${f(g2.pkW, 1)} кВт`)); }
   L.push(`  N = ${R.Ncells} эл; I макс = ${f(R.I_max, 1)} А; K t = ${f(R.Kt)}; C треб = ${f(R.C_req, 0)} Ач; K T = ${f(R.Ktemp, 3)}; K стар = ${f(R.Kaging)}`);
   L.push(`  C расч = ${f(R.C_corr, 0)} Ач/система; ${b ? `принято: ${b.b.name} ${b.Nser} посл. × ${b.n} цеп.; ёмкость ${f(R.C_bank, 0)} Ач; автономия ≈ ${f(R.t_real, 0)} мин; элементов всего ${R.cellsTotal}` : "АКБ не подобрана"}`);
   if (rp) L.push("", "4. СТЕЛЛАЖИ", `  ${rp.rk.name}: ${rp.nr} на систему, ${rp.racksTotal} всего; масса заряж. ${f(rp.load, 0)} кг; нагрузка на пол ${f(rp.floor, 0)} кг/м2 (допуск ${f(s.floor, 0)}) ${rp.floor <= s.floor ? "— выдерживается" : "— ПРЕВЫШЕНА"}`);
@@ -618,42 +688,82 @@ function txtNote(R) {
   (R.checksOut || []).forEach(c => L.push(`  [${c[3] === null ? "и" : c[3] ? "x" : "!"}] ${c[0]} — ${c[2]}`));
   return L.join("\r\n");
 }
-function dxfText(s) { // ASCII-safe: кириллица и символы >127 → \U+XXXX (стандарт DXF,reader'ы NanoCAD/AutoCAD понимают)
-  return String(s).replace(/[;\r\n]/g, " ").split("").map(ch => {
+/* ---- DXF R12, кодировка Windows-1251: кириллица читается в NanoCAD/AutoCAD ---- */
+const CP1251 = (() => {
+  const m = {};
+  "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ".split("").forEach((c, i) => { m[c] = 0xC0 + i; });
+  "абвгдежзийклмнопрстуфхцчшщъыьэюя".split("").forEach((c, i) => { m[c] = 0xE0 + i; });
+  m["Ё"] = 0xA8; m["ё"] = 0xB8; m["°"] = 0xB0; m["±"] = 0xB1;
+  m["·"] = 0xB7; m["№"] = 0xB9; m["«"] = 0xAB; m["»"] = 0xBB;
+  return m;
+})();
+const DXF_TRANS = (() => {
+  const m = {};
+  m["—"] = "-"; m["–"] = "-"; m["‘"] = "'"; m["’"] = "'";
+  m["“"] = "\""; m["”"] = "\""; m["…"] = "...";
+  m["→"] = "->"; m["←"] = "<-"; m["≤"] = "<="; m["≥"] = ">="; m["≈"] = "~";
+  m["×"] = "x"; m["÷"] = "/"; m["⎓"] = "="; m["−"] = "-";
+  m["α"] = "a"; m["β"] = "b"; m["η"] = "n"; m["φ"] = "f"; m["π"] = "p";
+  m["Σ"] = "S"; m["Δ"] = "D"; m["Ω"] = "Om"; m["µ"] = "u"; m["²"] = "2"; m["√"] = "kv.";
+  m["§"] = "p."; m["†"] = "+"; m["•"] = "-";
+  return m;
+})();
+function dxfSanitize(str) { // оставляем ASCII и cp1251-символы; прочее — транслитерация
+  let out = "";
+  for (const ch of String(str)) {
     const c = ch.codePointAt(0);
-    return c > 127 ? "\\U+" + c.toString(16).toUpperCase().padStart(4, "0") : ch;
-  }).join("");
+    if (c === 10 || c === 13 || c === 59) out += " ";
+    else if (c < 127) out += ch;
+    else if (DXF_TRANS[ch] !== undefined) out += DXF_TRANS[ch];
+    else if (CP1251[ch] !== undefined) out += ch;
+    else out += "?";
+  }
+  return out;
+}
+function dxfBytes(str) { // строка → байты Windows-1251
+  const a = [];
+  for (const ch of str) {
+    const c = ch.codePointAt(0);
+    a.push(c < 127 ? c : (CP1251[ch] !== undefined ? CP1251[ch] : 0x3F));
+  }
+  return new Uint8Array(a);
 }
 function prims2dxf(P) {
-  /* DXF R12 (ASCII) — формат, который NanoCAD/AutoCAD/Компас-3D открывают без конвертации.
-     Векторные примитивы: LINE, POLYLINE-стрелки, TEXT с привязкой и экранированием кириллицы. */
+  /* DXF R12 (ASCII + ANSI_1251): LINE, CIRCLE, TEXT. Только левое выравнивание,
+     центрирование compensated сдвигом X — так текст не «ломается» ни в одном редакторе. */
   const H = P.H;
-  let o = "0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n9\n$DWGCODEPAGE\n3\nANSI_1251\n9\n$EXTMIN\n10\n0\n20\n0\n30\n0\n9\n$EXTMAX\n10\n" + P.W + "\n20\n" + H + "\n30\n0\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLTYPE\n70\n1\n0\nLTYPE\n2\nCONTINUOUS\n70\n0\n3\nSolid line\n72\n65\n73\n0\n40\n0\n0\nLTYPE\n2\nDASHED\n70\n0\n3\nDashed\n72\n65\n73\n2\n40\n6\n49\n4\n49\n-2\n0\nENDTAB\n0\nTABLE\n2\nSTYLE\n70\n1\n0\nSTYLE\n2\nSTANDARD\n70\n0\n40\n0\n41\n1\n50\n0\n71\n0\n42\n2.5\n3\nxrefpxr\n4\n\n0\nENDTAB\n0\nTABLE\n2\nLAYER\n70\n1\n0\nLAYER\n2\n0\n70\n0\n62\n7\n6\nCONTINUOUS\n0\nLAYER\n2\nSCHEME\n70\n0\n62\n7\n6\nCONTINUOUS\n0\nLAYER\n2\nTEXT\n70\n0\n62\n3\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n";
-  const y = v => (H - v).toFixed(2);
+  const y = (v) => (H - v).toFixed(2);
+  let o = "0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n9\n$DWGCODEPAGE\n3\nANSI_1251\n0\nENDSEC\n";
+  o += "0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n1\n0\nLAYER\n2\nSCHEME\n70\n0\n62\n7\n6\nCONTINUOUS\n0\nLAYER\n2\nTEXT\n70\n0\n62\n3\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n";
+  o += "0\nSECTION\n2\nENTITIES\n";
   for (const e of P.els) {
     if (e.t === "l") o += `0\nLINE\n8\nSCHEME\n10\n${e.x1.toFixed(2)}\n20\n${y(e.y1)}\n30\n0\n11\n${e.x2.toFixed(2)}\n21\n${y(e.y2)}\n31\n0\n`;
     else if (e.t === "r") {
       const c = [[e.x, e.y], [e.x + e.w, e.y], [e.x + e.w, e.y + e.h], [e.x, e.y + e.h]];
-      for (let i = 0; i < 4; i++) { const q = c[i], r2 = c[(i + 1) % 4];
-        o += `0\nLINE\n8\nSCHEME\n10\n${q[0].toFixed(2)}\n20\n${y(q[1])}\n30\n0\n11\n${r2[0].toFixed(2)}\n21\n${y(r2[1])}\n31\n0\n`; }
-    }
-    else if (e.t === "n") { const r = e.r || 2.2;
-      o += `0\nCIRCLE\n8\nSCHEME\n10\n${e.x.toFixed(2)}\n20\n${y(e.y)}\n30\n0\n40\n${r.toFixed(2)}\n`; }
-    else if (e.t === "c") {
-      const pts = [];
-      for (let i = 0; i <= 16; i++) { const a = i / 16 * 2 * Math.PI; pts.push([e.x + e.r * Math.cos(a), e.y + e.r * Math.sin(a)]); }
-      for (let i = 0; i < pts.length - 1; i++) o += `0\nLINE\n8\nSCHEME\n10\n${pts[i][0].toFixed(2)}\n20\n${y(pts[i][1])}\n30\n0\n11\n${pts[i + 1][0].toFixed(2)}\n21\n${y(pts[i + 1][1])}\n31\n0\n`;
-    }
-    else if (e.t === "p") { const q = e.pts;
-      for (let i = 0; i < q.length; i++) { const a2 = q[i], r2 = q[(i + 1) % q.length]; o += `0\nLINE\n8\nSCHEME\n10\n${a2[0].toFixed(2)}\n20\n${y(a2[1])}\n30\n0\n11\n${r2[0].toFixed(2)}\n21\n${y(r2[1])}\n31\n0\n`; } }
-    else if (e.t === "t") {
-      const al = { start: 0, middle: 1, end: 2 }[e.align || "start"];
-      o += `0\nTEXT\n8\nTEXT\n10\n${e.x.toFixed(2)}\n20\n${y(e.y)}\n30\n0\n40\n${((e.size || 9) * 1.15).toFixed(2)}\n1\n${dxfText(e.s || "")}\n`;
-      if (al) o += `50\n0\n72\n${al}\n11\n${e.x.toFixed(2)}\n21\n${y(e.y)}\n31\n0\n73\n0\n`;
+      for (let i = 0; i < 4; i++) {
+        const q = c[i], r2 = c[(i + 1) % 4];
+        o += `0\nLINE\n8\nSCHEME\n10\n${q[0].toFixed(2)}\n20\n${y(q[1])}\n30\n0\n11\n${r2[0].toFixed(2)}\n21\n${y(r2[1])}\n31\n0\n`;
+      }
+    } else if (e.t === "c" || e.t === "n") {
+      o += `0\nCIRCLE\n8\nSCHEME\n10\n${e.x.toFixed(2)}\n20\n${y(e.y)}\n30\n0\n40\n${(e.r || 2.2).toFixed(2)}\n`;
+    } else if (e.t === "p") {
+      const q = e.pts;
+      for (let i = 0; i < q.length; i++) {
+        const a2 = q[i], r2 = q[(i + 1) % q.length];
+        o += `0\nLINE\n8\nSCHEME\n10\n${a2[0].toFixed(2)}\n20\n${y(a2[1])}\n30\n0\n11\n${r2[0].toFixed(2)}\n21\n${y(r2[1])}\n31\n0\n`;
+      }
+    } else if (e.t === "t") {
+      const sz = +(((e.size || 9) * 1.15).toFixed(2));
+      const txt = dxfSanitize(e.s || "");
+      const wE = txt.length * sz * 0.52 + 3;
+      let tx = e.x;
+      if (e.align === "middle") tx -= wE / 2; else if (e.align === "end") tx -= wE;
+      o += `0\nTEXT\n8\nTEXT\n10\n${tx.toFixed(2)}\n20\n${(y(e.y) - sz * 0.2).toFixed(2)}\n30\n0\n40\n${sz.toFixed(2)}\n1\n${txt}\n`;
     }
   }
   return o + "0\nENDSEC\n0\nEOF\n";
 }
+function dxfBlob(P) { return new Blob([dxfBytes(prims2dxf(P))], { type: "application/dxf" }); }
 function xlsCell(v) { return `<td>${String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;")}</td>`; }
 function makeXls(R) {
   const s = R.s;
@@ -676,8 +786,26 @@ function makeXls(R) {
 function fillBatSelect() {
   $("bat-name").innerHTML = '<option value="">— автовыбор —</option>' + BATTERIES.map(b => `<option value="${b.id}">${b.name.trim()} (${b.V} В, ${b.Ah} А·ч, ${b.life} г)</option>`).join("");
 }
+function renderGrpTable() {
+  const tb = $("grp-table"); if (!tb) return;
+  tb.innerHTML = "<tr><th>№</th><th>Наименование нагрузки</th><th>Мощность, кВт</th><th>Время от АКБ, мин</th><th></th></tr>" +
+    GRP.map((g, i) => `<tr><td>${i + 1}</td><td><input class="nm" data-g="name" data-i="${i}" value="${String(g.name || "").replace(/"/g, "&quot;")}"></td>
+      <td><input type="number" step="0.1" min="0" data-g="p" data-i="${i}" value="${g.p}"></td>
+      <td><input type="number" step="5" min="1" data-g="t" data-i="${i}" value="${g.t}"></td>
+      <td><button type="button" class="btn-del" data-del="${i}" title="Удалить группу">✕</button></td></tr>`).join("");
+}
+function saveGrps() { try { localStorage.setItem("ibp-grps", JSON.stringify(GRP)); } catch (e) {} }
+function wireGrp() {
+  $("btn-load-add").onclick = () => { GRP.push({ name: "Нагрузка-" + (GRP.length + 1), p: 1, t: 30 }); saveGrps(); renderGrpTable(); run(); };
+  $("grp-table").addEventListener("input", ev => {
+    const ds = ev.target.dataset;
+    if (ds && ds.i !== undefined && ds.g) { GRP[+ds.i][ds.g] = ds.g === "name" ? ev.target.value : (parseFloat(ev.target.value) || 0); saveGrps(); run(); } });
+  $("grp-table").addEventListener("click", ev => {
+    const d = ev.target.dataset && ev.target.dataset.del;
+    if (d !== undefined) { GRP.splice(+d, 1); saveGrps(); renderGrpTable(); run(); } });
+}
 const IDS = ["p-type", "proj-name", "p-kw", "p-cos", "p-eff", "p-kodn", "p-kzap", "p-mot-x", "p-mot-k", "t-min", "t-temp", "u-dc", "u-end",
-  "red", "bat-mode", "bat-name", "bat-ah", "bat-v", "bat-life", "ip-uc", "chg-eff", "room-l", "room-w", "floor-load", "seismic", "cable-len"];
+  "red", "bat-mode", "bat-name", "bat-ah", "bat-v", "bat-life", "ip-uc", "chg-eff", "room-l", "room-w", "floor-load", "seismic", "cable-len", "grp-on"];
 function syncDeps() {
   const isAC = val("p-type") === "ac", man = val("bat-mode") === "manual";
   $("p-cos").disabled = !isAC; $("p-eff").disabled = !isAC;
@@ -695,14 +823,13 @@ function run() {
   const R = calc(s);
   LAST_R = R;
   R.spec = specRows(R);
-  R.checksOut = null;
   renderUps(R); renderBat(R); renderRacks(R); renderLayout(R);
   $("out-scheme").innerHTML = prims2svg(currentScheme(R));
   renderChecks(R); renderSpec(R); renderMethod(R);
 }
 function boot() {
-  fillBatSelect();
-  $("p-type").addEventListener("change", () => {  // смена рода тока: адекватное напряжение батареи по умолчанию
+  fillBatSelect(); renderGrpTable(); wireGrp();
+  $("p-type").addEventListener("change", () => {
     const ac = val("p-type") === "ac", u = $("u-dc");
     if (ac && +(u.value) < 200) u.value = "240";
     if (!ac && +(u.value) > 150) u.value = "110";
@@ -712,23 +839,43 @@ function boot() {
   $("btn-xls").onclick = () => { run(); if (LAST_R) dl(`IBP_${LAST_R.s.proj}.xls`, makeXls(LAST_R)); };
   $("btn-txt").onclick = () => { if (LAST_R) dl(`IBP_${LAST_R.s.proj}_zapiska.txt`, new Blob(["\ufeff" + txtNote(LAST_R)], { type: "text/plain;charset=utf-8" })); };
   $("btn-svg").onclick = () => { if (LAST_R) dl(`IBP_${LAST_R.s.proj}_shema.svg`, new Blob([prims2svg(currentScheme(LAST_R))], { type: "image/svg+xml" })); };
-  $("btn-dxf").onclick = () => { if (LAST_R) dl(`IBP_${LAST_R.s.proj}_shema.dxf`, new Blob([prims2dxf(currentScheme(LAST_R))], { type: "application/dxf" })); };
-  $("btn-save").onclick = () => { const d = {}; IDS.forEach(id => d[id] = val(id)); d._date = new Date().toISOString();
+  $("btn-dxf").onclick = () => { if (LAST_R) dl(`IBP_${LAST_R.s.proj}_shema.dxf`, dxfBlob(currentScheme(LAST_R))); };
+  $("btn-save").onclick = () => {
+    const d = {}; IDS.forEach(id => { d[id] = id === "grp-on" ? $("grp-on").checked : val(id); });
+    d.GRP = GRP; d._date = new Date().toISOString();
     dl(`IBP_${val("proj-name")}_project.json`, new Blob([JSON.stringify(d, null, 2)], { type: "application/json" }));
-    localStorage.setItem("ibp-last", JSON.stringify(d)); };
+    localStorage.setItem("ibp-last", JSON.stringify(d));
+  };
   $("btn-load").onclick = () => $("file-load").click();
-  $("file-load").onchange = ev => { const fl = ev.target.files[0]; if (!fl) return; const rd = new FileReader();
-    rd.onload = () => { try { const d = JSON.parse(rd.result); IDS.forEach(id => { if (d[id] !== undefined) $(id).value = d[id]; }); syncDeps(); run(); $("err-box").innerHTML = '<span class="ok">Проект загружен.</span>'; }
-      catch (e) { $("err-box").innerHTML = "✗ Неверный файл проекта: " + e.message; $("err-box").className = "bad"; } };
-    rd.readAsText(fl); };
+  $("file-load").onchange = ev => {
+    const fl = ev.target.files[0]; if (!fl) return; const rd = new FileReader();
+    rd.onload = () => {
+      try {
+        const d = JSON.parse(rd.result);
+        IDS.forEach(id => { if (d[id] !== undefined) { if (id === "grp-on") $("grp-on").checked = !!d[id]; else $(id).value = d[id]; } });
+        if (Array.isArray(d.GRP)) { GRP = d.GRP; renderGrpTable(); }
+        syncDeps(); run(); $("err-box").innerHTML = '<span class="ok">Проект загружен.</span>';
+      } catch (e) { $("err-box").innerHTML = "✗ Неверный файл проекта: " + e.message; $("err-box").className = "bad"; }
+    };
+    rd.readAsText(fl);
+  };
   $("btn-demo").onclick = () => {
     const demo = { "p-type": "dc", "proj-name": "Оперативная-DC-110", "p-kw": "10", "u-dc": "110", "t-min": "60", "t-temp": "25",
       "u-end": "1.75", "red": "2x100", "bat-mode": "auto", "ip-uc": "IP42", "chg-eff": "93", "seismic": "8", "room-l": "12", "room-w": "6", "floor-load": "1500", "cable-len": "10" };
-    IDS.forEach(id => { if (demo[id] !== undefined) $(id).value = demo[id]; });
-    syncDeps(); run();
+    IDS.forEach(id => { if (id !== "grp-on" && demo[id] !== undefined) $(id).value = demo[id]; });
+    $("grp-on").checked = true;
+    GRP = [{ name: "Аварийное освещение", p: 3, t: 90 }, { name: "КИП и АСУ ТП (шкаф)", p: 2, t: 60 }, { name: "Приводы отключения", p: 5, t: 30 }];
+    renderGrpTable();
+    saveGrps(); syncDeps(); run();
   };
   const last = localStorage.getItem("ibp-last");
-  if (last) { try { const d = JSON.parse(last); IDS.forEach(id => { if (d[id] !== undefined) $(id).value = d[id]; }); } catch (e) {} }
+  if (last) {
+    try {
+      const d = JSON.parse(last);
+      IDS.forEach(id => { if (d[id] !== undefined) { if (id === "grp-on") $("grp-on").checked = !!d[id]; else $(id).value = d[id]; } });
+      if (Array.isArray(d.GRP)) { GRP = d.GRP; renderGrpTable(); }
+    } catch (e) {}
+  }
   run();
 }
 document.addEventListener("DOMContentLoaded", boot);
