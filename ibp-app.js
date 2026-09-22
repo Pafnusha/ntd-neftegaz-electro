@@ -30,9 +30,9 @@ function round100(x) { return Math.ceil(x / 1) * 1; }
 
 /* SECTION: inputs */
 let GRP = [
-  { name: "Освещение аварийное", p: 2, t: 120 },
-  { name: "КИП и АСУ ТП (шкаф)", p: 1.5, t: 60 },
-  { name: "Приводы отключения", p: 6, t: 30 }
+  { name: "Освещение аварийное", p: 2, t: 120, ph: "1~" },
+  { name: "КИП и АСУ ТП (шкаф)", p: 1.5, t: 60, ph: "1~" },
+  { name: "Приводы отключения", p: 6, t: 30, ph: "3~" }
 ];
 try { const g0 = localStorage.getItem("ibp-grps"); if (g0) GRP = JSON.parse(g0); } catch (e) {}
 function readState() {
@@ -49,7 +49,7 @@ function readState() {
     roomL: num("room-l"), roomW: num("room-w"), floor: num("floor-load"),
     seismic: num("seismic"), cableLen: num("cable-len"),
     grpOn: $("grp-on") ? $("grp-on").checked : false,
-    grps: GRP.map(g => ({ name: g.name, p: +g.p || 0, t: +g.t || 0 }))
+    grps: GRP.map(g => ({ name: g.name, p: +g.p || 0, t: +g.t || 0, ph: g.ph || "auto" }))
   };
   return s;
 }
@@ -84,6 +84,13 @@ function calc(s) {
   R.marginEff = R.ups_kVA ? R.ups_kVA / R.S_kVA : null;
   R.I_out = isAC ? R.ups_kVA * 1000 / 230 : R.ups_kVA * 1000 / s.udc;
   R.I_in = isAC ? R.ups_kVA * 1000 * 1.15 / 230 : R.ups_kVA * 1000 * 1.15 / s.udc;
+  R.qf_out = breakerOf(R.I_out * 1.25);
+  {
+    const basePh = isAC ? (s.P >= 5 ? "3~" : "1~") : "DC";
+    const fl = [{ name: "Базовая (неснимаемая)", p: s.P, t: s.tmin, ph: basePh, base: true }];
+    if (s.grpOn) s.grps.forEach(g => fl.push({ name: g.name, p: g.p, t: g.t, ph: isAC ? ((g.ph && g.ph !== "auto") ? g.ph : "1~") : "DC" }));
+    R.feeders = fl.map(g => feederFor(R, g));
+  }
 
   /* --- 3.x АКБ: ступенчатый график по ГОСТ Р МЭК 60896-21-2013 --- */
   R.warn = [];
@@ -425,9 +432,9 @@ function symSTP(P, x, y, pos, inf) { // статический переключ�
   P.els.push({ t: "l", x1: x - 6, y1: y - 4, x2: x + 6, y2: y - 4, sw: 1.3 });
   P.els.push({ t: "p", pts: [[x - 6, y - 5], [x + 6, y - 5], [x, y + 4]] });
   P.els.push({ t: "l", x1: x - 6, y1: y + 4, x2: x + 6, y2: y + 4, sw: 1.3 });
-  P.els.push({ t: "t", x: x + 40, y: y - 8, s: pos, size: 7.5, bold: true, color: "#7a3fd8" });
+  P.els.push({ t: "t", x: x + 40, y: y - 14, s: pos, size: 7.5, bold: true, color: "#7a3fd8" });
   const lines = Array.isArray(inf) ? inf : (inf ? String(inf).split("\n") : []);
-  lines.forEach((ln, i) => P.els.push({ t: "t", x: x + 40, y: y + i * 8, s: ln, size: 6.5, color: "#7a3fd8" }));
+  lines.forEach((ln, i) => P.els.push({ t: "t", x: x + 40, y: y + 2 + i * 8, s: ln, size: 6.5, color: "#7a3fd8" }));
 }
 function symConv(P, x, y, w, h, kind, pos, inf) { // преобразователь (ГОСТ 2.747/2.721)
   P.els.push({ t: "r", x: x - w / 2, y: y - h / 2, w, h, fill: "#f6faff", stroke: "#223344", sw: 1.4 });
@@ -448,125 +455,233 @@ function box(P, x, y, w, h, text, sub, fill, posOut) {
 }
 function wire(P, pts, sw) { for (let i = 0; i < pts.length - 1; i++) P.els.push({ t: "l", x1: pts[i][0], y1: pts[i][1], x2: pts[i + 1][0], y2: pts[i + 1][1], sw: sw || 1.4 }); }
 function wEst(str, size) { return String(str).length * (size || 7) * 0.56; }
-function schemeAC(R) {
-  const s = R.s, n = R.nsys, isRed = n > 1;
-  const b = R.bat;
-  const vcInfo = [`3~/380 В —> ${s.udc} В DC, I зy ${f(R.I_chg, 0)} А`, `вых. 230 В ±1 %, 50 Гц ±1 Гц, S ${R.ups_kVA || "—"} кВА`],
-    gbInfo = [`${R.NcellsBat}×${b ? b.b.V : 2} В · ${f(R.C_bank || 0, 0)} А·ч (C10)`,
-      `I разр ${f(R.I_max, 0)} А · U кон ${f(s.uend)} В/эл`,
-      `t ступ.: ${R.loadList.map(g => `${f(g.p, 1)} кВт/${f(g.t, 0)} мин`).join(", ")}`];
-  const infoW = Math.max(wEst(vcInfo[0], 6.5), wEst(vcInfo[1], 6.5), wEst(gbInfo[2], 6.5), wEst(`S ${R.ups_kVA || "—"} кВА · I вых ${f(R.I_out, 0)} А`, 6.5));
-  const colStep = Math.max(360, infoW + 200);
-  const x0 = 210, yDC = 208, yOut = isRed ? 402 : 402;
-  const xE = x0 + (n - 1) * colStep;
-  const xBy = xE + colStep * 0.78;
-  const shnX = (x0 + (isRed ? xBy : xE + 60)) / 2 - 95;
-  const loads = R.loadList, loadBoxW = Math.max(270, 24 + Math.max(...loads.map(g => wEst(`Ф${g.name} · ${g.p} кВт · ${g.t} мин`, 6.8))));
-  const P = { W: Math.max(1060, xBy + (isRed ? 240 : 200), shnX + 120 + loadBoxW + 60), H: 500 + loads.length * 13 + 90, els: [] };
-  P.els.push({ t: "t", x: 20, y: 22, s: `Схема электрическая структурная. ИБП переменного тока${isRed ? " 2×100 %" : ""} — ${s.proj}`, size: 11.5, bold: true });
-  P.els.push({ t: "t", x: 20, y: 38, s: `ГОСТ 2.702-2011/2.701-2008; УГО — ГОСТ 2.7х ЕСКД. Класс VFI·SS·1·PF1 (ГОСТ IEC 62040-3-2024). Резервирование: ${isRed ? "2 системы × 100 %, байпас общий" : "1 система (без резерва)"}.`, size: 8 });
+function wrapTxt(s, maxc) {
+  const words = String(s).split(/\s+/);
+  const out = [];
+  let ln = "";
+  for (const w of words) {
+    if ((ln + " " + w).trim().length > maxc) { if (ln) out.push(ln.trim()); ln = w; }
+    else ln += " " + w;
+  }
+  if (ln.trim()) out.push(ln.trim());
+  return out;
+}
+/* ===== фидер: фазность -> полюса автомата, Iн, кабель ===== */
+function feederFor(R, g) {
+  const s = R.s;
+  const ph = g.ph || (s.type === "ac" ? "1~" : "DC");
+  let U, poles, cores, phTxt;
+  if (ph === "3~") { U = 400; poles = "4P"; cores = 5; phTxt = "3~400"; }
+  else if (ph === "DC") { U = s.udc; poles = "2P (+/-)"; cores = 2; phTxt = s.udc + " DC"; }
+  else { U = 230; poles = "2P (L+N)"; cores = 3; phTxt = "1~230"; }
+  const I = g.p * 1000 / (U * (ph === "3~" ? 1.73 : 1)) / (ph === "DC" ? 1 : Math.max(s.cos, 0.8));
+  return { name: g.name, p: g.p, t: g.t, ph, phTxt, I, In: breakerOf(I * 1.25), poles, cores, s: cableOf(I * 1.25).s, base: !!g.base };
+}
+/* ===== ОДНОЛИНЕЙНАЯ СХЕМА ИБП: схема + Таблица 1 (сигналы в АСУ Э) + примечания ===== */
+function schemeSL(R) {
+  const s = R.s, ac = s.type === "ac", n = Math.max(1, R.nsys), b = R.bat;
+  const feed = R.feeders || [], fN = Math.max(1, feed.length);
+  const colW = 400, x0 = 215;
+  const cab = upsCabOf(R.ups_kVA);
+  const yQFin = 78, yVC = 150, yZ = 198, yNC = 277, ySF = 337, yQF3 = 399, yBus = 442;
+  const xEndSys = x0 + (n - 1) * colW;
+  const xby = xEndSys + 330, xqsb = xby + 85;
+  const busL = 40, busR = Math.max(xqsb + 45, fN * 92 + 120);
+  const P = { W: Math.max(1400, busR + 40), H: 900, els: [] };
+  const e = t => P.els.push(t);
+  const L = (x1, y1, x2, y2, sw) => e({ t: "l", x1, y1, x2, y2, sw: sw || 1.3 });
+  const ND = (x, y) => e({ t: "n", x, y });
+  const T = (x, y, st, o) => { const p = { t: "t", x, y, s: st, size: 6.4 }; if (o) Object.assign(p, o); e(p); };
+  /* лист/шапка */
+  T(16, 26, `Схема электрическая однолинейная. Система бесперебойного питания ${ac ? "переменного" : "постоянного"} тока (ИБП) — ${s.proj}`, { size: 10.5, bold: true });
+  T(16, 38, `ГОСТ 2.702-2011, ГОСТ 2.701-2008; УГО — ГОСТ 2.7х ЕСКД (QF — 2.710/2.755; SA — 2.710; GB — 2.722; VC/NC/SF — 2.747). Лист 1 · ИБП-Сх-01 · стадия Р · масштаб не пропорционален.`, { size: 6.2, color: "#5a6a7e" });
+  T(P.W - 16, 26, `Резервирование: ${n > 1 ? "2 системы × 100 %" : "1 система (без резерва)"} · Источник схемы: расчётный модуль ИБП`, { size: 6.5, align: "end" });
   for (let i = 0; i < n; i++) {
-    const cx = x0 + i * colStep, nm = "AB"[i] || String(i + 1);
-    P.els.push({ t: "t", x: cx, y: 58, s: `Ввод ${nm}: 3~/380 В, I вх ${f(R.I_in, 0)} А`, size: 8, align: "middle" });
-    wire(P, [[cx, 64], [cx, 79]]); symQF(P, cx, 92, `QF${i * 2 + 1}`, `${R.qf_in} А`);
-    wire(P, [[cx, 106], [cx, 128]]);
-    symConv(P, cx, 150, 130, 44, "rec", `VC-${nm}`, vcInfo);
-    wire(P, [[cx, 172], [cx, yDC]]);
-    wire(P, [[cx, yDC], [cx, 240]]);
-    symConv(P, cx, 262, 130, 44, "inv", `NC-${nm}`, [`I вых ${f(R.I_out, 0)} А · η ≥ 92 %`, `косв. нагрузка ${f(s.P, 1)} кВт cos φ ${f(s.cos)}`]);
-    wire(P, [[cx, 284], [cx, 330]]);
-    symSTP(P, cx, 344, `SF-${nm}`, `I ном ${f(R.I_out, 0)} А`);
-    wire(P, [[cx, 358], [cx, yOut]]);
-    const bx = cx - 150;
-    wire(P, [[bx, yDC], [bx, 226]]);
-    symQF(P, bx, 240, `QF-${nm}`, [`${R.qf_bat} А`, `I расч ${f(R.I_max * 1.25, 0)} А`]);
-    wire(P, [[bx, 254], [bx, 276]]);
-    symSA(P, bx, 288, `SA-${nm}`, `${R.qf_bat} А`);
-    wire(P, [[bx, 294], [bx, 318]]);
-    symBat(P, bx, 352, `GB-${nm}`, gbInfo);
+    const cx = x0 + i * colW, nm = "AB".slice(i, i + 1) || String(i + 1);
+    const bx = cx - 100, ox = cx + 95;
+    /* шкаф */
+    e({ t: "r", x: cx - 138, y: 94, w: 293, h: 352, fill: "none", stroke: "#98a4b5", sw: 0.9, dash: "8 4" });
+    T(cx - 130, 104, `Шкаф ИБП-${nm} · ${R.ups_kVA}${ac ? " кВА" : " кВт"} · ${ac ? "VFI·SS·1·PF1" : "DC " + s.udc + " В ±10 %"} · IP42`, { size: 6.2, bold: true });
+    T(cx - 134, 118, `габ. ${cab.L}×${cab.W}×${cab.H} мм · внутри — однолинейка шкафа`, { size: 5.4, color: "#5a6a7e" });
+    /* ввод */
+    T(cx - 128, yQFin - 2, `Ввод №${i + 1}: ~400 В 50 Гц от секции №${i + 1} РУ НН`, { size: 6 });
+    L(cx, yQFin + 6, cx, yQFin + 14);
+    symQF(P, cx, yQFin + 22, `QF${i + 1}`, [`${R.qf_in} А · 4P`, `Ir=(0,4…1)In · LSI`]);
+    L(cx, yQFin + 37, cx, yVC - 18);
+    symConv(P, cx, yVC, 110, 36, "rec", "", [`VC-${nm} ~400→${s.udc} В`, `Iзy ${f(R.I_chg, 0)} А · η ${f(s.chgEff * 100, 0)} %`]);
+    L(cx, yVC + 18, cx, yZ);
+    /* звено DC */
+    L(bx - 14, yZ, ox, yZ, 2);
+    ND(cx, yZ);
+    T(ox - 2, yZ - 5, `звено DC ${s.udc} В`, { size: 5.8, bold: true, align: "end" });
+    /* веть АКБ */
+    ND(bx, yZ);
+    L(bx, yZ, bx, yZ + 12);
+    symQF(P, bx, yZ + 24, `QFB-${nm}`, `${R.qf_bat} А · 2P`);
+    L(bx, yZ + 37, bx, yZ + 48);
+    symSA(P, bx, yZ + 56, `SA-${nm}`, `т. пост. ${s.udc} В · ${R.qf_bat} А`);
+    L(bx, yZ + 68, bx, yZ + 78);
+    e({ t: "r", x: bx - 27, y: yZ + 78, w: 54, h: 30, fill: "#f2f5fa", stroke: "#223344", sw: 1.1 });
+    T(bx, yZ + 89, `+ GB-${nm}`, { size: 6, align: "middle", bold: true });
+    T(bx, yZ + 100, `− ${s.udc} В`, { size: 6, align: "middle" });
+    T(bx, yZ + 116, `${R.NcellsBat} эл. · ${f(R.C_bank || 0, 0)} А·ч (C10)`, { size: 5.6, align: "middle" });
+    T(bx, yZ + 124, `I разр ${f(R.I_max, 0)} А · t ${f(R.Tend || 0, 0)} мин`, { size: 5.6, align: "middle" });
+    T(bx, yZ + 132, `VRLA · ≥${b ? b.b.life : 25} лет · ГОСТ 2.722`, { size: 5.6, align: "middle" });
+    T(bx, yZ + 141, `шкаф АБ · ВВГнг-LS ${R.s_bat_cable} мм² ${f(s.cableLen, 0)} м`, { size: 5.2, align: "middle", color: "#33465e" });
+    /* выход */
+    if (ac) {
+      L(ox, yZ, ox, yNC - 18); ND(ox, yZ);
+      symConv(P, ox, yNC, 130, 32, "inv", "", [`NC-${nm} ~230 В ±1 % · 50 Гц ±1 Гц`, `S ${R.ups_kVA} кВА · I ${f(R.I_out, 0)} А`]);
+      L(ox, yNC + 16, ox, ySF - 15);
+      symSTP(P, ox, ySF, `SF-${nm}`, `${f(R.I_out, 0)} А`);
+      L(ox, ySF + 15, ox, yQF3 - 15);
+      symQF(P, ox, yQF3, `QF${i ? 4 : 3}`, [`${R.qf_out} А · 4P · LSI`, `незав. расцеп. (откл. от АСУ Э)`]);
+      L(ox, yQF3 + 15, ox, yBus); ND(ox, yBus);
+    } else {
+      L(ox, yZ, ox, yQF3 - 15); ND(ox, yZ);
+      symQF(P, ox, yQF3, `QF${i ? 4 : 3}`, [`${R.qf_out} А · 2P · LSI`, `незав. расцеп. (откл. от АСУ Э)`]);
+      L(ox, yQF3 + 15, ox, yBus); ND(ox, yBus);
+    }
+    if (n === 1) T(cx + 160, yQFin + 8, "Ввод №2 (резервный) не применён — без резервирования", { size: 5.6, color: "#8a97a8" });
   }
-  for (let i = 0; i < n; i++) { P.els.push({ t: "n", x: x0 + i * colStep, y: yDC }, { t: "n", x: x0 + i * colStep - 150, y: yDC }); }
-  P.els.push({ t: "l", x1: x0 - 150, y1: yDC, x2: xE + 20, y2: yDC, sw: 2.6 });
-  P.els.push({ t: "t", x: (x0 + xE) / 2 - 65, y: yDC - 8, s: "Шина постоянного тока (звено DC)", size: 8.5, bold: true, align: "middle" });
-  const shnEnd = isRed ? xBy : (xE + 20);
-  if (isRed) {
-    P.els.push({ t: "t", x: xBy - 12, y: 58, s: "Резервная (байпасная) линия 3~/380 В", size: 8, align: "middle" });
-    wire(P, [[xBy, 64], [xBy, 92]]);
-    symQF(P, xBy, 106, "QF9", `${R.qf_in} А`);
-    wire(P, [[xBy, 120], [xBy, 330]]);
-    symSTP(P, xBy, 344, "SF9", `I ном ${f(R.I_out, 0)} А`);
-    wire(P, [[xBy, 358], [xBy, yOut]]);
-    P.els.push({ t: "n", x: xBy, y: yOut });
+  /* байпас AC */
+  if (ac) {
+    T(xby - 60, 66, `Резервная (байпасная) линия ~400 В`, { size: 6 });
+    L(xby, 70, xby, yQFin + 2);
+    symQF(P, xby, yQFin + 16, "QF10", `${R.qf_in} А · 4P`);
+    L(xby, yQFin + 31, xby, yNC - 18);
+    symSTP(P, xby, yNC, "SF10", `байпас I ${f(R.I_out, 0)} А`);
+    L(xby, yNC + 15, xby, ySF);
+    symSA(P, xby, ySF + 12, "QSB", [`ремонтный байпас`, `блокировка с QF${n > 1 ? "3/QF4" : "3"}`]);
+    L(xby, ySF + 28, xby, yBus);
+    ND(xby, yBus);
+    T(xby - 68, 56, `Шкаф байпаса · ${upsCabOf(R.ups_kVA).L}×${upsCabOf(R.ups_kVA).W}×${upsCabOf(R.ups_kVA).H}`, { size: 5.6, bold: true });
+    L(x0 + 95, ySF + 34, xby, ySF + 34, 1.4);
+    for (let i = 0; i < n; i++) { const ox = x0 + i * colW + 95; e({ t: "n", x: ox, y: ySF + 34 }); }
+    T((x0 + 95 + xby) / 2, ySF + 28, `обходная линия ~400/230 В к выходам NC (через SF${n > 1 ? "…SF10" : ""})`, { size: 5.6, align: "middle", color: "#5a6a7e" });
+  } else {
+    const px = xEndSys + 200;
+    L(xEndSys + 95, yZ, px, yZ, 2);
+    e({ t: "r", x: px - 70, y: yZ + 26, w: 165, h: 46, fill: "#f6f8f6", stroke: "#223344" });
+    T(px - 64, yZ + 42, `ПКИ — контроль изоляции`, { size: 6, bold: true });
+    T(px - 64, yZ + 54, `шин ${s.udc} В (плавающая) · авария → АСУ Э`, { size: 5.2 });
+    L(px, yZ + 26, px, yZ, 1); ND(px, yZ);
   }
-  P.els.push({ t: "l", x1: x0, y1: yOut, x2: shnEnd, y2: yOut, sw: 2.6 });
-  for (let i = 0; i < n; i++) P.els.push({ t: "n", x: x0 + i * colStep, y: yOut });
-  P.els.push({ t: "t", x: Math.min(xE + 90, shnEnd - 40), y: yOut - 7, s: "Шина 230 В ±1 %, 50 Гц ±1 Гц — плавающая нейтраль (ТУ п.5.2)", size: 8.5, align: "middle", bold: true });
-  box(P, shnX, 430, 210, 42, "ШСН (ЩС) — щит собств. нужд", `вводной QF ${R.qf_in} А · I ном ${f(R.I_out, 0)} А`);
-  wire(P, [[shnX + 100, yOut], [shnX + 100, 430]]);
-  P.els.push({ t: "n", x: shnX + 100, y: yOut });
-  /* фидеры нагрузок с разным временем автономии */
-  const ly = 502;
-  box(P, shnX + 230, ly - 30, loadBoxW, 26 + loads.length * 13, "Фидеры ИБП (группы нагрузки)", null);
-  wire(P, [[shnX + 210, 451], [shnX + 230, 451], [shnX + 230, ly - 4]], 1.2);
-  loads.forEach((g, j) => P.els.push({ t: "t", x: shnX + 240, y: ly + 16 + j * 13, s: `Ф${j + 1} — ${g.name} — ${f(g.p, 1)} кВт — t = ${f(g.t, 0)} мин`, size: 6.8 }));
-  P.els.push({ t: "l", x1: 90, y1: P.H - 34, x2: P.W - 40, y2: P.H - 34, dash: "5 3", color: "#7a3fd8", sw: 1.1 });
-  P.els.push({ t: "t", x: 94, y: P.H - 41, s: "Цепи управления и сигнализации: RS-485/Modbus RTU, «сухие контакты», контроль изоляции, датчики T° (компенсация заряда), ОПС", size: 7.5, color: "#7a3fd8" });
-  P.els.push({ t: "t", x: 20, y: P.H - 12, s: "QF — автоматический выключатель (ГОСТ 2.710/2.755); SA — разъединитель; GB — батарея (ГОСТ 2.722); VC/NC — выпрямитель/инвертор (ГОСТ 2.747); SF — статический переключатель. Параметры — из разделов 2–4.", size: 7, color: "#5a6a7e" });
+  /* шина ЩГП/ШПН */
+  L(busL, yBus, busR, yBus, 3);
+  T(busL + 2, yBus - 6, ac ? `ЩГП ИБП (ШСН) ~400/230 В 50 Гц · L1,L2,L3,N,PE · Iкз(3) принять ${f(R.Ikz3 || 14.6, 1)} кА` : `ШПН-A/B ${s.udc} В — две взаимно резервируемые секции`, { bold: true, size: 7.5 });
+  T(busR - 4, yBus - 6, `УЗИП II классе`, { size: 5.8, align: "end", color: "#5a6a7e" });
+  /* фидеры */
+  const step = Math.min(92, (busR - 90) / fN);
+  feed.forEach((g, j) => {
+    const x = 62 + j * step;
+    L(x, yBus, x, yBus + 10); e({ t: "n", x, y: yBus });
+    symQF(P, x, yBus + 24, `QF${101 + j}`, [`${g.In} А · ${g.poles}`, g.ph === "DC" ? "Iт.о=10Iр · нез. расц." : "Ir=(0,8…1)In", "незав. расцеп."]);
+    L(x, yBus + 40, x, yBus + 50);
+    if (g.ph !== "DC") {
+      const xs = [-14, 0, 14];
+      const fl = g.ph === "3~" ? ["L1", "L2", "L3"] : ["L", "N", "PE"];
+      xs.forEach((d, k) => { L(x, yBus + 50, x + d, yBus + 56, 0.9); ND(x + d, yBus + 56); fl[k] && T(x + d, yBus + 62, fl[k], { size: 5, align: "middle", color: "#33465e" }); });
+      L(x - 14, yBus + 64, x + 14, yBus + 64, 0.9);
+      L(x, yBus + 64, x, yBus + 70);
+      if (g.ph === "3~") T(x - 27, yBus + 55, "N", { size: 5, align: "middle", color: "#33465e" });
+    } else { T(x - 11, yBus + 57, "+", { size: 6, align: "middle" }); T(x + 11, yBus + 57, "−", { size: 6, align: "middle" }); L(x, yBus + 50, x, yBus + 69, 1.1); }
+    L(x, yBus + 70, x, yBus + 90);
+    T(x + 6, yBus + 81, `ВВГнг(А)-LS ${g.cores}×${g.s}`, { size: 5, color: "#33465e" });
+    e({ t: "c", x, y: yBus + 84, r: 6 });
+    L(x - 4.3, yBus + 90, x + 4.3, yBus + 78, 1.2);
+    T(x, yBus + 99, `W${j + 1}`, { size: 5.4, align: "middle" });
+    e({ t: "r", x: x - 40, y: yBus + 104, w: 80, h: 22, fill: "#fff", stroke: "#223344", sw: 1 });
+    T(x, yBus + 112, g.name.slice(0, 20), { size: 5.2, align: "middle" });
+    T(x, yBus + 119, `${f(g.p, 1)} кВт · ${g.phTxt}${g.base ? " · баз." : ""} · t=${f(g.t, 0)} мин`, { size: 5.2, align: "middle" });
+  });
+  /* таблица сигналов */
+  const sig = signalRows(R, ac, n, fN);
+  const yTbl = yBus + 150;
+  T(40, yTbl, "Таблица 1 — Перечень сигналов, передаваемых от электрооборудования системы ИБП в АСУ Э", { size: 8, bold: true });
+  T(40, yTbl + 10, "Интерфейс: RS-485, Modbus RTU, через УСПД (шкаф байпаса). Карта регистров — по документации Поставщика. ДС — дискретный, АИ — аналоговый сигнал.", { size: 6, color: "#33465e" });
+  const CW = 178;
+  const half = Math.ceil(sig.length / 2);
+  function drawSig(tx, rows, off) {
+    let y = yTbl + 22;
+    T(tx + 2, y, "№", { size: 5.6, bold: true });
+    T(tx + 14, y, "Наименование сигнала", { size: 5.6, bold: true });
+    T(tx + CW - 34, y, "Тип", { size: 5.6, bold: true });
+    T(tx + CW - 16, y, "Ист.", { size: 5.6, bold: true });
+    y += 8;
+    rows.forEach((rw, i) => {
+      T(tx + 2, y, String(off + i + 1), { size: 5.6 });
+      T(tx + 14, y, rw[0], { size: 5.6 });
+      T(tx + CW - 34, y, rw[1], { size: 5.6 });
+      T(tx + CW - 16, y, rw[2], { size: 5.6 });
+      y += 7.6;
+    });
+    L(tx, yTbl + 14, tx + CW, yTbl + 14, 0.7);
+    L(tx, y + 1, tx + CW, y + 1, 0.7);
+    L(tx, yTbl + 14, tx, y + 1, 0.7);
+    L(tx + CW, yTbl + 14, tx + CW, y + 1, 0.7);
+    L(tx + CW - 38, yTbl + 14, tx + CW - 38, y + 1, 0.5);
+    L(tx + CW - 20, yTbl + 14, tx + CW - 20, y + 1, 0.5);
+    return y;
+  }
+  const ye1 = drawSig(40, sig.slice(0, half), 0);
+  const ye2 = drawSig(40 + CW + 16, sig.slice(half), half);
+  /* примечания */
+  const notes = notesArr(R, ac, n, fN);
+  const nx0 = 40 + (CW + 16) * 2 + 10;
+  T(nx0, yTbl + 2, "Примечания", { size: 8, bold: true });
+  let ny = yTbl + 18;
+  const nWrap = Math.max(78, Math.floor((Math.max(1400, busR + 40) - nx0 - 24) / 2.72));
+  notes.forEach(nt => wrapTxt(nt, nWrap).forEach((ln, i) => { T(nx0 + (i ? 20 : 0), ny, ln, { size: 5.8 }); ny += 7.2; }));
+  /* рамка листа */
+  P.H = Math.max(ye1, ye2, ny) + 50;
+  P.W = Math.max(P.W, 70 + fN * step + 90, nx0 + 560);
+  P.els.unshift({ t: "r", x: 6, y: 6, w: P.W - 12, h: P.H - 12, fill: "none", stroke: "#33465e", sw: 1.6 });
+  T(P.W - 16, P.H - 14, `Лист 1 · Листов 1 · Дата ${new Date().toLocaleDateString("ru-RU")}`, { size: 6, align: "end", color: "#5a6a7e" });
   return P;
 }
-function schemeDC(R) {
-  const s = R.s, n = R.nsys, b = R.bat;
-  const avrInfo = [`3~/380 В —> ${s.udc} В ±10 %, ${R.ups_kVA || f(s.P, 0)} кВт`, `I ${f(R.I_chg, 0)} А · η ${f(s.chgEff * 100, 0)} % · 2×100 %`];
-  const gbInfo = [`${R.NcellsBat}×2 В · ${f(R.C_bank || 0, 0)} А·ч · VRLA`,
-    `I разр ${f(R.I_max, 0)} А · U кон ${f(s.uend)} В`,
-    `t ступ.: ${R.loadList.map(g => `${f(g.p, 1)} кВт/${f(g.t, 0)} мин`).join("; ")}`];
-  const infoW = Math.max(wEst(avrInfo[0], 6.5), wEst(gbInfo[2], 6.5));
-  const colStep = Math.max(360, infoW + 230);
-  const x0 = 250, yB = 168;
-  const xE = x0 + (n - 1) * colStep;
-  const loads = R.loadList, loadBoxW = Math.max(280, 24 + Math.max(...loads.map(g => wEst(`Ф${g.name} · ${g.p} кВт · ${g.t} мин`, 6.8))));
-  const P = { W: Math.max(1060, xE + colStep * 0.6 + 240, xE + 240), H: 470 + loads.length * 13 + 100, els: [] };
-  P.els.push({ t: "t", x: 20, y: 22, s: `Схема электрическая структурная. ИБП постоянного тока 2×100 % — ${s.proj}`, size: 11.5, bold: true });
-  P.els.push({ t: "t", x: 20, y: 38, s: `ГОСТ IEC 62040-5-3-2024 (UPS DC), безопасность — ГОСТ IEC 62040-1-2024, ЭМС — ГОСТ IEC 62040-2. ГОСТ 2.702-2011; УГО — ГОСТ 2.7х ЕСКД. Систем: ${n}.`, size: 8 });
-  for (let i = 0; i < n; i++) {
-    const cx = x0 + i * colStep, nm = "AB"[i] || String(i + 1);
-    P.els.push({ t: "t", x: cx, y: 60, s: `Ввод ${nm}: сеть 3~/380 В`, size: 8, align: "middle" });
-    wire(P, [[cx, 66], [cx, 78]]); symQF(P, cx, 92, `QF${i + 1}`, `${R.qf_in} А`);
-    wire(P, [[cx, 106], [cx, 128]]);
-    symConv(P, cx, 150, 150, 44, "rec", `VC-${nm}`, avrInfo);
-    wire(P, [[cx, 172], [cx, yB]]);
-    const bx = cx - 120;
-    wire(P, [[bx, yB], [bx, 196]]);
-    symQF(P, bx, 210, `QF${i + 3}`, [`${R.qf_bat} А`, `I расч ${f(R.I_max * 1.25, 0)} А`]);
-    wire(P, [[bx, 224], [bx, 252]]);
-    symSA(P, bx, 266, `SA-${nm}`, `${R.qf_bat} А`);
-    wire(P, [[bx, 276], [bx, 320]]);
-    symBat(P, bx, 356, `GB-${nm}`, gbInfo);
-    P.els.push({ t: "n", x: bx, y: yB }, { t: "n", x: cx, y: yB }, { t: "n", x: cx + 88, y: yB });
-    /* шпн */
-    box(P, cx - 80, 420, 160, 40, `ШПН-${nm} ${s.udc} В`, `QF отх. ≤ ${Math.ceil(R.I_out / 6)} А`);
-    wire(P, [[cx + 88, yB], [cx + 88, 400], [cx, 400], [cx, 420]]);
-  }
-  for (let i = 0; i < n; i++) {
-    const cx = x0 + i * colStep;
-    P.els.push({ t: "l", x1: cx - 140, y1: yB, x2: cx + 112, y2: yB, sw: 2.6 });
-    P.els.push({ t: "t", x: cx - 14, y: yB - 7, s: `Шина DC-${"AB"[i] || i + 1} ${s.udc} В`, size: 8, align: "middle", bold: true });
-  }
-  if (n > 1) P.els.push({ t: "t", x: 20, y: P.H - 66, s: "Системы A и B разнесены конструктивно: раздельные шкафы, шины и стеллажи (ТУ п.5.2).", size: 7.5, color: "#b26a00" });
-  const ly = 500;
-  box(P, x0 - 150, ly - 14, loadBoxW, 30 + loads.length * 13, "Фидеры ШПН (группы нагрузки с разным t)", null);
-  wire(P, [[x0 - 80, 460], [x0 - 80, ly - 14]], 1.2);
-  loads.forEach((g, j) => P.els.push({ t: "t", x: x0 - 140, y: ly + 18 + j * 13, s: `Ф${j + 1} — ${g.name} — ${f(g.p, 1)} кВт — t = ${f(g.t, 0)} мин`, size: 6.8 }));
-  box(P, xE - 120, P.H - 210, 210, 40, "Контроль изоляции", `${s.udc} В, плавающая шина`);
-  wire(P, [[xE - 15, P.H - 210], [xE - 15, yB]], 1);
-  P.els.push({ t: "n", x: xE - 15, y: yB });
-  P.els.push({ t: "l", x1: 90, y1: P.H - 34, x2: P.W - 40, y2: P.H - 34, dash: "5 3", color: "#7a3fd8", sw: 1.1 });
-  P.els.push({ t: "t", x: 94, y: P.H - 41, s: "Цепи управления и сигнализации: «сухие контакты», RS-485, датчики T° у АКБ (компенсация заряда, ТУ п.5.6.1.32)", size: 7.5, color: "#7a3fd8" });
-  P.els.push({ t: "t", x: 20, y: P.H - 12, s: "VC — выпрямитель/зарядное; GB — батарея (ГОСТ 2.722); QF — автомат; SA — разъединитель; ШПН — щит постоянного напряжения. Параметры — из расчёта.", size: 7, color: "#5a6a7e" });
-  return P;
+function signalRows(R, ac, n, fN) {
+  return [
+    ["Вкл/откл вводных автоматов", "ДС", "QF1…QF" + n],
+    ["Авария общая ИБП (сборная)", "ДС", "контроллер"],
+    ["Напряжение сети в допуске", "ДС", "шкаф ИБП"],
+    ["Работа от сети", "ДС", "шкаф ИБП"],
+    ["Работа от батарей", "ДС", "шкаф ИБП"],
+    ["Переход на статбайпас", "ДС", "SF1…SF" + (n + 1)],
+    ["Ремонтный байпас включен", "ДС", "QSB"],
+    ["Неисправность выпрямителя", "ДС", "VC1…VC" + n],
+    ["Отказ обдува шкафа", "ДС", "шкаф ИБП"],
+    ["Перегрев / авария датчика T°", "ДС", "датчики T°"],
+    ["Разряд АКБ до УКЗН", "ДС", "контроллер"],
+    ["Отключен QFB (цепь АКБ)", "ДС", "QFB-1…"],
+    ["Авария изоляции (шина DC)", "ДС", ac ? "—" : "ПКИ"],
+    ["Отключение фидера по t автономии", "ДС", `QF101…QF${100 + fN}`],
+    [ac ? "U, I, P, f, cos φ вход/выход" : "U, I, P выходной цепи DC", "АИ", "шкаф ИБП"],
+    [ac ? "Напряжение и ток звена DC" : "Напряжение шины DC", "АИ", "VC-колонки"],
+    ["Ток заряда АКБ", "АИ", "VC-колонки"],
+    ["T° воздуха и АКБ", "АИ", "датчики T°"],
+    ["Состояние АКБ (U,I,R,SOS/SOH)", "АИ", "контроль АКБ"],
+    ["Загрузка ИБП % / остаток мин", "АИ", "шкаф ИБП"],
+  ];
+}
+function notesArr(R, ac, n, fN) {
+  const s = R.s, b = R.bat;
+  return [
+    `1. Номиналы вводных и выходных автоматов ИБП (QF1…QF${n + 2}, QF10) указаны предварительно и подлежат уточнению Поставщиком, в т.ч. по корректному учёту тока заряда АКБ (${f(R.I_chg, 0)} А) и токам КЗ на шинах РУ НН.`,
+    `2. Автоматические выключатели QF1…QF${n + 2} — с электронными расцепителями с защитами LSI (L — перегрузка, Ir=(0,4…1)In; S — отсечка с выдержкой; I — отсечка мгновенная); фидерные автоматы ЩГП — с независимыми расцепителями.`,
+    `3. В щите ЩГП (ШСН) / ШПН предусмотрено автоматическое отключение групп потребителей по истечении заявленного времени автономного питания от ИБП (для каждой группы — своё t мин; отключение — независимыми расцепителями QF101…QF${100 + fN} по сигналу УСПД/контроллера ИБП).`,
+    `4. В ЩГП (ШСН) и ШПН установить УЗИП II класса для защиты от атмосферных и коммутационных перенапряжений; выполнить координацию с защитой ИБП.`,
+    `5. Фазность фидерных автоматов: 2P (L+N, цепь 1~230 В), 4P (цепи 3~400 В), 2P (+/−, цепи постоянного тока); отходящие линии — кабели марок ВВГнг(А)-LS, сечения по расчёту (ΔU ≤ 2 %, ПУЭ табл. 1.3.6).`,
+    `6. АКБ: ${b ? `${R.NcellsBat} эл. по ${b.b.cells6 ? "12" : "2"} В · ${f(R.C_bank || 0, 0)} А·ч (C10) на цепочку, батарей на систему — ${R.bat.n}; VRLA (ГОСТ Р МЭК 60896-21), срок службы ≥ ${b.b.life} лет` : "—"}; ветвь АКБ защищена QFB и разъединена SA у плюсового вывода (ГОСТ Р МЭК 62485-2); зазоры между блоками 10…20 мм.`,
+    `7. Предельное время автономии — ≈ ${f(R.t_real || 0, 0)} мин (с учётом деградации 20 % и температуры ${f(s.temp, 0)} °C); требуемое — ${f(R.Tend || s.tmin, 0)} мин (ступенчатый график см. раздел 3 модуля).`,
+    `8. Кабели между шкафом ИБП и шкафом АБ (звено DC ${s.udc} В) — комплектно с ИБП; L=${f(s.cableLen, 0)} м; падение ΔU ≤ 2 %.`,
+    `9. Защитное и функциональное заземление — по гл. 1.7 ПУЭ; не менее двух точек присоединения шины ФЗШ к ГЗШ на каждый шкаф.`,
+    `10. Внутри каждого шкафа — однолинейная электрическая схема и паспортная табличка (нерж. сталь); окраска RAL 7035; подвод кабелей снизу; секционирование 2b; на вводах — амперметр и вольтметр; на лицевой панели — мнемосхема и индикация.`,
+    `11. Схема выполнена укрупнённо: THDi-фильтр, вторичные цепи и аппараты, требуемые опросным листом/вендор-листом, условно не показаны, но входят в объём поставки.`,
+  ];
 }
 
-function currentScheme(R) { return R.s.type === "ac" ? schemeAC(R) : schemeDC(R); }
+function currentScheme(R) { return schemeSL(R); }
 
 /* SECTION: checks-spec-method */
 function renderChecks(R) {
@@ -630,6 +745,11 @@ function specRows(R) {
     `${rp.rk.L}×${rp.rk.W}×${rp.rk.H} мм, ярусов ${rp.rk.levels || 3}, крепление к полу (при сейсмичности ≥8 — по расчёту СП 14.13330)`,
     rp.racksTotal, "шт.", "нагрузка на пол проверена: п.4");
   push("Кабель цепей АКБ, медь, нг(А)-LS", `${R.s_bat_cable} мм²`, f(2 * s.cableLen * R.nsys, 0), "м", `L расч. ${f(s.cableLen, 0)} м; ΔU ≤ 2 %`);
+  const fd = (R.feeders || []);
+  if (fd.length) {
+    push("Аппарат защиты групповой сети ЩГП/ШПН", fd.map(g => `«${g.name.slice(0,14)}» — ${g.In} А ${g.poles}`).join("; "), fd.length, "шт.", "QF101…; независимые расцепители: авт. отключение по истечении времени автономии группы");
+    push("Кабели фидеров гарантированного питания", fd.map(g => `${g.cores}×${g.s}`).join("; "), "по трассам", "м", "ВВГнг(А)-LS; см. однолинейную схему");
+  }
   push("Кабель питания ИБП, медь, нг(А)-LS", `${R.s_in_cable} мм²`, f(2 * s.cableLen, 1), "м", "ПУЭ табл. 1.3.6");
   push("Автоматический выключатель батарейной цепи (QF)", `${R.qf_bat} А; ${isAC ? "2P" : "2P"}; Icu ≥ 10 кА`, R.nsys, "шт.", "1,25·I макс.разряда");
   push("Автоматический выключатель ввода (QF)", `${R.qf_in} А; ${isAC ? "4P" : "4P (вход выпрямителя)"}`, R.nsys, "шт.", "селективность — по ТЗ на защиту");
@@ -656,7 +776,7 @@ function renderMethod(R) {
   <p><b>Зарядное устройство (ТУ п.5.7):</b> I ЗУ = P бат/(U·η) + C 10ч ; КПД ≥ 90 %.</p>
   <p><b>Кабели:</b> сечение по ПУЭ (длительный допуск, табл. 1.3.6) и потере напряжения ΔU ≤ 2 % для ответственных цепей; батареи — медь, наконечники пластины/болты по ТУ п.5.6.1.31.</p>
   <p><b>Стеллажи:</b> груз на 1 стеллаж и удельная нагрузка на пол (масса/пятно) относительно допускаемого значения помещения; при сейсмичности ≥8 баллов — расчёт по СП 14.13330; зазоры между АКБ 10–20 мм и проходы обслуживания 1,0 м по ГОСТ Р МЭК 62485-2.</p>
-  <p><b>Схема:</b> УГО по ЕСКД (ГОСТ 2.710/2.721/2.722/2.730/2.747), правила выполнения — ГОСТ 2.701-2008, ГОСТ 2.702-2011; все параметры элементов заполнены по результатам расчёта. Экспорт: SVG (вектор) и DXF R12 (NanoCAD / AutoCAD / Компас-3D; DWG — сохранение из NanoCAD).</p>
+  <p><b>Схема электрическая однолинейная:</b> правила выполнения — ГОСТ 2.701-2008, ГОСТ 2.702-2011; УГО — ГОСТ 2.7х ЕСКД. Состав листа: однолинейная схема (вводы, шкафы ИБП, ветви АКБ с QFB/SA, байпас и ремонтный QSB, щит ЩГП/ШПН с фидерами), Таблица 1 (сигналы в АСУ Э: ДС/АИ, RS-485/Modbus RTU через УСПД) и примечания. Фазность фидерного автомата: 1~230 В — 2P(L+N), 3~400 В — 4P, DC — 2P(+/−); у каждого QF — In, уставка Ir, отсечка. Экспорт: SVG и DXF R12 (NanoCAD / AutoCAD / Компас-3D; DWG — Save As в NanoCAD).</p>
   <p><b>Нормативная база:</b> ПУЭ 7-е изд.; ГОСТ IEC 62040-1-2024 (безопасность UPS, введён 01.04.2026 взамен ГОСТ IEC 62040-1-2018); ГОСТ IEC 62040-2 (ЭМС); ГОСТ IEC 62040-3-2024 (методы испытаний UPS AC); ГОСТ IEC 62040-5-3-2024 (UPS постоянного тока — характеристики и испытания); ГОСТ Р МЭК 60896-21-2013; ГОСТ Р МЭК 62485-2-2011; IEC 60146; IEEE 519; ТУ проекта 3300-E-000-EL-SPE-00021-00-D_02U. Все коэффициенты вынесены в ibp-data.js и подлежат сверке с паспортами конкретных изделий.</p>`;
 }
 
@@ -788,18 +908,22 @@ function fillBatSelect() {
 }
 function renderGrpTable() {
   const tb = $("grp-table"); if (!tb) return;
-  tb.innerHTML = "<tr><th>№</th><th>Наименование нагрузки</th><th>Мощность, кВт</th><th>Время от АКБ, мин</th><th></th></tr>" +
+  tb.innerHTML = "<tr><th>№</th><th>Наименование нагрузки</th><th>Мощность, кВт</th><th>Время от АКБ, мин</th><th>Фазность (тип цепи фидера)</th><th></th></tr>" +
     GRP.map((g, i) => `<tr><td>${i + 1}</td><td><input class="nm" data-g="name" data-i="${i}" value="${String(g.name || "").replace(/"/g, "&quot;")}"></td>
       <td><input type="number" step="0.1" min="0" data-g="p" data-i="${i}" value="${g.p}"></td>
       <td><input type="number" step="5" min="1" data-g="t" data-i="${i}" value="${g.t}"></td>
+      <td><select data-g="ph" data-i="${i}">${(val("p-type") === "ac" ? [["1~","1~230 В · 2P(L+N)"],["3~","3~400 В · 4P"],["DC","DC · 2P(+/−)"]] : [["DC","DC 2P(+/−)"]]).map(o => `<option value="${o[0]}" ${(g.ph || (val("p-type") === "ac" ? "1~" : "DC")) === o[0] ? "selected" : ""}>${o[1]}</option>`).join("")}</select></td>
       <td><button type="button" class="btn-del" data-del="${i}" title="Удалить группу">✕</button></td></tr>`).join("");
 }
 function saveGrps() { try { localStorage.setItem("ibp-grps", JSON.stringify(GRP)); } catch (e) {} }
 function wireGrp() {
-  $("btn-load-add").onclick = () => { GRP.push({ name: "Нагрузка-" + (GRP.length + 1), p: 1, t: 30 }); saveGrps(); renderGrpTable(); run(); };
+  $("btn-load-add").onclick = () => { GRP.push({ name: "Нагрузка-" + (GRP.length + 1), p: 1, t: 30, ph: val("p-type") === "ac" ? "1~" : "DC" }); saveGrps(); renderGrpTable(); run(); };
   $("grp-table").addEventListener("input", ev => {
     const ds = ev.target.dataset;
-    if (ds && ds.i !== undefined && ds.g) { GRP[+ds.i][ds.g] = ds.g === "name" ? ev.target.value : (parseFloat(ev.target.value) || 0); saveGrps(); run(); } });
+    if (ds && ds.i !== undefined && ds.g) {
+      GRP[+ds.i][ds.g] = (ds.g === "name" || ds.g === "ph") ? ev.target.value : (parseFloat(ev.target.value) || 0);
+      saveGrps(); if (ds.g === "p" || ds.g === "t") renderGrpTable(); run();
+    } });
   $("grp-table").addEventListener("click", ev => {
     const d = ev.target.dataset && ev.target.dataset.del;
     if (d !== undefined) { GRP.splice(+d, 1); saveGrps(); renderGrpTable(); run(); } });
@@ -833,6 +957,7 @@ function boot() {
     const ac = val("p-type") === "ac", u = $("u-dc");
     if (ac && +(u.value) < 200) u.value = "240";
     if (!ac && +(u.value) > 150) u.value = "110";
+    renderGrpTable();
   });
   IDS.forEach(id => { const el = $(id); el && el.addEventListener("input", run); el && el.addEventListener("change", run); });
   $("btn-print").onclick = () => window.print();
@@ -864,7 +989,7 @@ function boot() {
       "u-end": "1.75", "red": "2x100", "bat-mode": "auto", "ip-uc": "IP42", "chg-eff": "93", "seismic": "8", "room-l": "12", "room-w": "6", "floor-load": "1500", "cable-len": "10" };
     IDS.forEach(id => { if (id !== "grp-on" && demo[id] !== undefined) $(id).value = demo[id]; });
     $("grp-on").checked = true;
-    GRP = [{ name: "Аварийное освещение", p: 3, t: 90 }, { name: "КИП и АСУ ТП (шкаф)", p: 2, t: 60 }, { name: "Приводы отключения", p: 5, t: 30 }];
+    GRP = [{ name: "Аварийное освещение", p: 3, t: 90, ph: "1~" }, { name: "КИП и АСУ ТП (шкаф)", p: 2, t: 60, ph: "1~" }, { name: "Приводы отключения", p: 5, t: 30, ph: "DC" }];
     renderGrpTable();
     saveGrps(); syncDeps(); run();
   };
