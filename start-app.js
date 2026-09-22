@@ -127,3 +127,13 @@
   window._startCompute=compute;
   demo();
 })();
+
+/* высота шапки на телефоне больше, чем на ПК — липкая строка строка считается по живой шапке */
+(function () {
+  function setHeadOffset() {
+    var h = document.querySelector('header');
+    if (h) document.documentElement.style.setProperty('--thead-top', Math.round(h.offsetHeight) + 'px');
+  }
+  setHeadOffset();
+  addEventListener('resize', setHeadOffset);
+})();
