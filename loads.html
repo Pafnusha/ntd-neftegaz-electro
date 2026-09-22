@@ -9,8 +9,10 @@
 <script>
 (async function () {
   try {
-    var b64 = await (await fetch('loads.html.gz.b64')).text();
-    var bin = Uint8Array.from(atob(b64.trim()), function (c) { return c.charCodeAt(0); });
+    async function get(u){ return (await (await fetch(u)).text()).trim(); }
+    var b64 = (await get('loads.html.gz.b64.0')) + (await get('loads.html.gz.b64.1'));
+    while (b64.length % 4) b64 += '=';
+    var bin = Uint8Array.from(atob(b64), function (c) { return c.charCodeAt(0); });
     var ds = new DecompressionStream('gzip');
     var stream = new Response(bin).body.pipeThrough(ds);
     var text = await new Response(stream).text();
