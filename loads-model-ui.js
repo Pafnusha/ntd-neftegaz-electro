@@ -5,6 +5,12 @@
 
   var netModel = null;
 
+  function fwLink(model, sel){
+    if (!sel) return null;
+    var src = sel === 'UPS' ? ((model.sources.find(function(x){return x.type==='UPS'}))||{}).id : sel;
+    var sec = (model.sections||[]).find(function(s2){ return (s2.fedBy||[]).indexOf(src)>=0; });
+    return { sectionId: sec?sec.id:'SEC-A', sourceId: src };
+  }
   function syncFromRtmRows() {
     var LA = window.__LA;
     if (!LA || !LC() || !LC().createEmptyModel) return null;
@@ -50,10 +56,10 @@
         cable: r.cable,
         mode: r.equipMode || 'auto',
         phase: r.phase || null,
-        feedWork: r.feedWork,
-        feedReserve: r.feedReserve,
-        feedWorkManual: !!r.feedWorkManual,
-        feedReserveManual: !!r.feedReserveManual
+        feedWork: r.fw ? fwLink(m, r.fw) : (r.feedWork || null),
+        feedReserve: r.fr === '-' ? null : (r.fr ? fwLink(m, r.fr) : (r.feedReserve || null)),
+        feedWorkManual: !!r.fw,
+        feedReserveManual: !!(r.fr)
       });
       m.consumers.push(c);
     });
@@ -67,6 +73,9 @@
     if (!box || !netModel) return;
     var g = netModel.group || {};
     var pb = netModel.phaseBalance || {};
+    var hasR = function(c){ return c.feedReserve && c.feedWork && c.feedReserve.sectionId && c.feedReserve.sectionId!==c.feedWork.sectionId; };
+    var nRes = (netModel.consumers||[]).filter(hasR).length;
+    var gc = $('gd-counts'); if (gc) gc.textContent = 'QF рабочих: ' + (netModel.consumers||[]).length + ' · QF резервных: ' + nRes;
     var src = (netModel.sources || []).map(function (s) { return s.id + '(' + s.type + ')'; }).join(', ');
     var err = (netModel.feedErrors || []).join('<br>') || '\u043d\u0435\u0442';
     box.innerHTML =
@@ -77,6 +86,7 @@
       '<div class="metric"><div class="lbl">\u03a3Sr, \u043a\u0412\u00b7\u0410</div><div class="val">' + (g.Sr != null ? g.Sr.toFixed(2) : '\u2014') + '</div></div>' +
       '<div class="metric ' + (pb.warning ? 'hi' : '') + '"><div class="lbl">\u041d\u0435\u0441\u0438\u043c\u043c\u0435\u0442\u0440\u0438\u044f</div><div class="val">' + (pb.imbalancePct != null ? pb.imbalancePct.toFixed(1) + '%' : '\u2014') + '</div></div>' +
       '<div class="metric"><div class="lbl">\u041f\u0430\u043d\u0435\u043b\u0438</div><div class="val">' + ((netModel.panels || []).length) + '</div></div>' +
+      '<div class="metric hi"><div class="lbl">QF раб. / QF рез. (N/M)</div><div class="val">' + (netModel.consumers||[]).length + ' / ' + nRes + '</div></div>' +
       '</div>' +
       '<p class="note">\u041e\u0448\u0438\u0431\u043a\u0438 \u0440\u0435\u0437\u0435\u0440\u0432\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u044f: <span class="' + ((netModel.feedErrors || []).length ? 'bad' : 'ok') + '">' + err + '</span></p>' +
       '<p class="note">L1/L2/L3 \u043a\u0412\u0442: ' +
@@ -155,6 +165,8 @@
           cable: c.cable,
           equipMode: c.mode,
           phase: c.phase,
+          fw: (c.feedWork && c.feedWork.sourceId==='UPS-1')?'UPS':(c.feedWork&&c.feedWork.sourceId)||'',
+          fr: (c.feedReserve? ((c.feedReserve.sourceId==='UPS-1')?'UPS':c.feedReserve.sourceId) : (c.category===3||c.category==='III'?'-':'')),
           feedWork: c.feedWork,
           feedReserve: c.feedReserve,
           feedWorkManual: !!c.feedWorkManual,
