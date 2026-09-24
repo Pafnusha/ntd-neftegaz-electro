@@ -20,19 +20,22 @@ function mmSheet(P) {
     if (e.t === "p" && e.pts) e.pts = e.pts.map(pt => [+(pt[0] * K).toFixed(2), +(pt[1] * K).toFixed(2)]);
     if (e.t === "t") e.size = snap(+((e.size || 7) * K).toFixed(2));
     if (typeof e.sw === "number") e.sw = +(e.sw * K).toFixed(3);
+    if (e.t === "l" && e.dash) { e.dash = String(e.dash).split(/\s+/).map(function (v) { return Math.max(0.4, (+v) * K * 1.6).toFixed(1); }).join(" "); }
   }
   P.W = +(P.W * K).toFixed(1);
   P.H = +(P.H * K).toFixed(1);
   const tx = P.els.filter(z => z.t === "t" && z.s);
   const bb = (a) => { const w = String(a.s).length * a.size * 0.75; let x0 = a.x; if (a.align === "middle") x0 -= w / 2; else if (a.align === "end") x0 -= w; return { x0, y0: a.y - a.size, x1: x0 + w, y1: a.y + a.size * 0.3 }; };
-  const move = (a, dx, dy) => { a.x = +(a.x + dx).toFixed(2); if (a.align === "middle") a.x = +(a.x - dx / 2).toFixed(2); if (a.align === "end") a.x = +(a.x - dx).toFixed(2); a.y = +(a.y + dy).toFixed(2); };
-  for (let sweep = 0; sweep < 40; sweep++) {
+  const move = (a, dx, dy) => { a.x = +(a.x + dx).toFixed(2); a.y = +(a.y + dy).toFixed(2); };
+  for (let sweep = 0; sweep < 90; sweep++) {
     let moved = false;
     for (let i = 0; i < tx.length; i++) for (let j = i + 1; j < tx.length; j++) {
       const a = bb(tx[i]), b = bb(tx[j]);
       const ox = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0), oy = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
-      if (ox > 0.3 && oy > 0.3) {
-        if (oy <= ox) { const dn = a.y0 < b.y0 ? tx[j] : tx[i]; move(dn, 0, oy + 0.8); }
+      if (ox > 0.6 && oy > 0.6) {
+        const ti0 = (tx[i].s || '').indexOf('Таблица') === 0, tj0 = (tx[j].s || '').indexOf('Таблица') === 0;
+        if (ti0 || tj0) { const dn = (oy <= 6 ? tx[i].y0 <= tx[j].y0 ? tx[i] : tx[j] : null) || (ti0 ? tx[i] : tx[j]); if (!ti0 && !tj0) break; const horiz = ox > oy; move(dn, horiz ? (dn === tx[j] ? ox + 1 : -(ox + 1)) : 0, horiz ? 0 : (dn.y < (tx[i].y + tx[j].y) / 2 ? -(oy + 1.5) : oy + 1.5)); moved = true; }
+        else if (oy <= ox) { const dn = a.y0 < b.y0 ? tx[j] : tx[i]; move(dn, 0, oy + 0.9); }
         else { const pair = tx[i].x <= tx[j].x ? [tx[i], tx[j]] : [tx[j], tx[i]]; move(pair[1], ox + 0.8, 0); }
         moved = true;
       }
@@ -40,6 +43,7 @@ function mmSheet(P) {
     if (!moved) break;
   }
   P.H = +(Math.max(P.H, ...tx.map(a => bb(a).y1)) + 10).toFixed(1);
+  { const seen = {}; P.els = P.els.filter(function (z) { if (z.t !== "n") return true; const k = Math.round(z.x) + ":" + Math.round(z.y); if (seen[k]) return false; seen[k] = 1; return true; }); }
   return P;
 }
 function prims2svg(P, k) {
@@ -154,4 +158,30 @@ function dimV(P, x, y1, y2, label) {
     P.els.push({ t: "l", x1: x - 4, y1: cy, x2: x + 4, y2: cy, sw: 0.7, color: "#5a6a7e" });
   }
   P.els.push({ t: "t", x: x - 3, y: (y1 + y2) / 2 + 2, s: label, size: 7, color: "#33465e", align: "end" });
+}
+
+
+/* ГОСТ 2.1105-2016: рамка (поля 20/5 мм) и основная надпись 185x55 мм; Координаты — в мм после mmSheet */
+function sheetFrame(P, info) {
+  var W = +P.W, H = +P.H, e = function (o) { P.els.push(o); };
+  var line = function (x1, y1, x2, y2, sw) { e({ t: "l", x1: x1, y1: y1, x2: x2, y2: y2, sw: sw || 0.35, color: "#223344" }); };
+  line(0, 0, W, 0, 0.35); line(W, 0, W, H, 0.35); line(W, H, 0, H, 0.35); line(0, H, 0, 0, 0.35);
+  line(20, 5, W - 5, 5, 0.7); line(W - 5, 5, W - 5, H - 5, 0.7); line(W - 5, H - 5, 20, H - 5, 0.7); line(20, H - 5, 20, 5, 0.7);
+  var bx = W - 5 - 185, by = H - 5 - 55;
+  [0, 13.75, 27.5, 41.25, 55].forEach(function (v) { line(bx, by + v, bx + 185, by + v, 0.35); });
+  [0, 40, 85, 110, 135, 185].forEach(function (v) { line(bx + v, by, bx + v, by + 55, 0.35); });
+  var T0 = function (x, y, s2, o) { P.els.push(Object.assign({ t: "t", x: x, y: y, s: String(s2), size: 2.5 }, o || {})); };
+  T0(bx + 2, by + 5, (info && info.doc) || "Расчётный модуль нагрузок · цифровая модель сети · ЭС-Нефтегаз");
+  T0(bx + 2, by + 9.5, (info && info.title) || "Схема электрическая однолинейная");
+  T0(bx + 2, by + 41, (info && info.date) || new Date().toLocaleDateString("ru-RU"));
+  T0(bx + 42, by + 19, "Стадия Р", { bold: true });
+  T0(bx + 42, by + 33, "Лит.", { bold: true });
+  T0(bx + 42, by + 46.5, "Годуев А.В.");
+  T0(bx + 87, by + 19, "Лист 1", { bold: true });
+  T0(bx + 87, by + 40, "Масшт. 1:1 (мм)");
+  T0(bx + 112, by + 19, "Листов 1", { bold: true });
+  T0(bx + 112, by + 33, "Сопр.");
+  T0(bx + 137, by + 46.5, "Изм./Лист №докум.Подп.Дата", { size: 2.5 });
+  T0(bx + 160, by + 28, "Формат А1 841x594 мм", { align: "end", bold: true });
+  return P;
 }

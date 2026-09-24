@@ -24,10 +24,10 @@ function nedSelectCable(Ir, L, phases, cosPhi, opts) {
 function byteLen(s) { var c = 0; for (var j = 0; j < s.length; j++) { var cc = s.charCodeAt(j); c += cc < 0x80 ? 1 : (cc < 0x800 ? 2 : 3); } return c; }
 function pdfEsc(s) { return String(s).replace(/[()\\]/g, function (c) { return "\\" + c; }).replace(/[^\x20-\x7E]/g, " "); }
 function pdfFromImageJpeg(jpegBytes, wPx, hPx, title) {
-  var pw = 1190.55, ph = 841.89, margin = 16;
+  var pw = 2383.7, ph = 1683.8, margin = 32; /* A1 landscape 841x594 мм = 1190x841 pt? — А1: 1189×841 мм = 3369×2384 pt */ var _1mm = 2.834649; pw = 1189 * _1mm; ph = 841 * _1mm;
   var k = Math.min((pw - 2 * margin) / wPx, (ph - 2 * margin) / hPx);
   var w = wPx * k, h = hPx * k, ox = (pw - w) / 2, oy = (ph - h) / 2;
-  var content = "q 1 0 0 1 0 0 cm BT /F1 8 Tf 40 " + (ph - 26) + " Td (" + pdfEsc(title || "Uninterruptible single-line scheme (ESKD)") + ") Tj ET Q\n"
+  var content = "q 1 0 0 1 0 0 cm BT /F1 16 Tf 60 " + (ph - 44) + " Td (" + pdfEsc(title || "Uninterruptible single-line scheme (ESKD)") + ") Tj ET Q\n"
     + "q " + w.toFixed(2) + " 0 0 " + h.toFixed(2) + " " + ox.toFixed(2) + " " + oy.toFixed(2) + " cm /Im0 Do Q\n";
   var objs = [
     "<< /Type /Catalog /Pages 2 0 R >>",

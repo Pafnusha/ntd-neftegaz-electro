@@ -37,6 +37,7 @@
       id: o.id || uid('N'),
       name: o.name || '',
       qty: o.qty != null ? o.qty : (o.n != null ? o.n : 1),
+      qtyNr: (function () { var qq = Number(o.qty != null ? o.qty : (o.n != null ? o.n : 1)) || 1; var qn = Number(o.qtyNr != null ? o.qtyNr : o.nr) || 0; return Math.max(0, Math.min(Math.floor(qn), Math.max(0, qq - 1))); })(),
       Pn_kW: o.Pn_kW != null ? o.Pn_kW : (o.pnUnit != null ? o.pnUnit : 0),
       ki: o.ki != null ? o.ki : 0.7,
       ks: o.ks != null ? o.ks : 0.5,
@@ -108,7 +109,7 @@
       c.qf = fieldApi.setAuto(c.qf, qfPick.In, qfPick.source);
     }
     c.qfCheck = qfPick.check;
-    var cabPick = cabApi.pickCable(c.Ir, {
+    var cabPick = cabApi.pickCable(c.Ir, {cosPhi: c.cosPhi || 0.8, 
       L: c.cableLength_m, phases: c.phases, UlineV: (c.U_kV || 0.4) * 1000, duLimPct: c.duLimPct, kLay: c.kLay
     });
     if (!fieldApi.isManual(c.cable) || force) {

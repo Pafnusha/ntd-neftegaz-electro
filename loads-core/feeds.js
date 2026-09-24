@@ -70,17 +70,15 @@
           cc.feedDes = feedLink(secDes.id, secDes.fedBy[0]);
         }
       } else {
-        var useA = (toggle++ % 2) === 0;
-        var sec = useA ? secA : (secB || secA);
-        var src = useA ? grids[0] : (grids[1] || grids[0]);
-        cc.feedWork = feedLink(sec && sec.id, src && src.id);
+        /* правило проекта: основные нагрузки — на 1-ю секцию (рабочий ввод V1/SEC-A);
+           резервные (кат. II) — на 2-ю секцию SEC-B; кат. III — без резерва */
+        cc.feedWork = feedLink(secA && secA.id, grids[0] && grids[0].id);
         if (cat === 2 || cat === 'II') {
-          var other = useA ? secB : secA;
-          var otherSrc = useA ? grids[1] : grids[0];
-          if (other && otherSrc) cc.feedReserve = feedLink(other.id, otherSrc.id);
+          cc.feedReserve = secB ? feedLink(secB.id, grids[1] && grids[1].id) : null;
         } else {
           cc.feedReserve = null;
         }
+        toggle = toggle; void toggle;
       }
 
       if (c.feedWorkManual) cc.feedWork = c.feedWork;

@@ -7,11 +7,11 @@
   };
   var api = function (D) {
     'use strict';
-    function duPct(I, L, s, phases, UlineV) {
+    function duPct(I, L, s, phases, UlineV, cosIn) {
       var cat = D.catalog || {};
       var R = (cat.rOhmKm && cat.rOhmKm[s]) || 1.15;
       var X = cat.xOhmKm != null ? cat.xOhmKm : 0.08;
-      var cos = 0.85, sin = Math.sqrt(Math.max(0, 1 - cos * cos));
+      var cos = (cosIn && cosIn > 0.2 && cosIn <= 1) ? Number(cosIn) : 0.85, sin = Math.sqrt(Math.max(0, 1 - cos * cos));
       var U = UlineV || 400;
       if (phases === 1) {
         return (2 * I * (R * cos + X * sin) * L / 1000) / (U / Math.sqrt(3)) * 100;

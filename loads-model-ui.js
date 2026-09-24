@@ -39,6 +39,7 @@
         id: r.netId || ('EP-' + (i + 1)),
         name: r.name,
         qty: r.n,
+        qtyNr: Number(r.nr)||0,
         Pn_kW: r.pnUnit,
         ki: r.ki,
         ks: r.ks,
@@ -64,6 +65,7 @@
       m.consumers.push(c);
     });
     netModel = LC().recalculate(m);
+    perSectionBalance(netModel);
     st.netModel = netModel;
     return netModel;
   }
@@ -149,7 +151,7 @@
           id: 'r' + Math.random().toString(36).slice(2, 8),
           netId: c.id,
           name: c.name,
-          n: c.qty,
+          n: c.qty, nr: (c.qtyNr||0),
           pnUnit: c.Pn_kW,
           ki: c.ki,
           cosPhi: c.cosPhi,
@@ -195,6 +197,29 @@
     document.body.appendChild(a); a.click(); a.remove();
   }
 
+  function perSectionBalance(mm){
+    try {
+      var bySec = {};
+      (mm.consumers || []).forEach(function (c) { var k = (c.feedWork && c.feedWork.sectionId) || '?'; (bySec[k] = bySec[k] || []).push(c); });
+      Object.keys(bySec).forEach(function (k) {
+        var list = bySec[k];
+        var sums = { L1: 0, L2: 0, L3: 0 };
+        function wk(c){ var q = Math.max(1, c.qty||1); var nr = Math.max(0, Math.min(c.qtyNr||0, Math.max(0, q - 1))); return (c.Pr || 0) * (q - nr) / q; }
+        list.forEach(function (c) {
+          if (c.phases !== 1) { sums.L1 += wk(c) / 3; sums.L2 += wk(c) / 3; sums.L3 += wk(c) / 3; return; }
+          if (c.phaseManual && c.phase) sums[c.phase] += wk(c);
+        });
+        list.filter(function (c) { return c.phases === 1 && !c.phaseManual; }).sort(function (a2, b2) { return wk(b2) - wk(a2); }).forEach(function (c) {
+          var best = ['L1','L2','L3'].sort(function (l2, r2) { return sums[l2] - sums[r2]; })[0];
+          c.phase = best; sums[best] += wk(c);
+        });
+        list.filter(function (c) { return c.phases === 1 && !c.phase; }).forEach(function (c) { c.phase = 'L1'; });
+      });
+      var all = { sums: { L1: 0, L2: 0, L3: 0 } };
+      (mm.consumers || []).forEach(function (c) { if (c.phases !== 1) { all.sums.L1 += (c.Pr||0)/3; } else if (c.phase) all.sums[c.phase] += c.Pr; });
+      mm.phaseBalanceWorkBySection = bySec;
+    } catch (e) { console.warn('balance', e); }
+  }
   function bind() {
     var b1 = $('btn-net-refresh');
     var b2 = $('btn-ktp1');
