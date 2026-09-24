@@ -8,9 +8,13 @@ function wrapTxt(s, maxc) {
   if (ln.trim()) out.push(ln.trim()); return out;
 }
 function mmSheet(P) {
+  /* ГОСТ 2.1.115-82 ряд; по требованию — не мельче 3,5 мм (кроме вспомог. 2,5 при очень dense layout) */
   const GOST = [2.5, 3.5, 5, 7];
-  const snap = (v) => (v <= 2.95 ? 2.5 : v <= 3.9 ? 3.5 : v <= 5.5 ? 5 : 7);
-  const K = 0.5;
+  const snap = (v) => (v <= 2.55 ? 2.5 : v <= 4.0 ? 3.5 : v <= 5.6 ? 5 : 7);
+  /* лист А1 (1189×841 мм поля): вписать масштаб, шрифты — из ГОСТ-ряда (мин 2,5 мм) */
+  let K = 0.5;
+  if (P.W * K > 1160) K = 1160 / P.W;
+  if (P.H * K > 810) K = Math.min(K, 810 / P.H);
   for (const e of P.els) {
     for (const k of ["x", "y", "x1", "y1", "x2", "y2", "w", "h", "r"]) if (typeof e[k] === "number") e[k] = +(e[k] * K).toFixed(2);
     if (e.t === "p" && e.pts) e.pts = e.pts.map(pt => [+(pt[0] * K).toFixed(2), +(pt[1] * K).toFixed(2)]);
@@ -18,6 +22,7 @@ function mmSheet(P) {
     if (typeof e.sw === "number") e.sw = +(e.sw * K).toFixed(3);
   }
   P.W = +(P.W * K).toFixed(1);
+  P.H = +(P.H * K).toFixed(1);
   const tx = P.els.filter(z => z.t === "t" && z.s);
   const bb = (a) => { const w = String(a.s).length * a.size * 0.75; let x0 = a.x; if (a.align === "middle") x0 -= w / 2; else if (a.align === "end") x0 -= w; return { x0, y0: a.y - a.size, x1: x0 + w, y1: a.y + a.size * 0.3 }; };
   const move = (a, dx, dy) => { a.x = +(a.x + dx).toFixed(2); if (a.align === "middle") a.x = +(a.x - dx / 2).toFixed(2); if (a.align === "end") a.x = +(a.x - dx).toFixed(2); a.y = +(a.y + dy).toFixed(2); };
