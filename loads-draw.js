@@ -104,11 +104,13 @@ function qfIn(Ir) { var x = (typeof LC().selectQf === "function") ? LC().selectQ
 function phLabel(c) { return c.phases === 1 ? ("U" + (c.phase || "L?")) : "3~"; }
 function workSplitV3(c) {
   var q = Math.max(1, Number(c.qty) || 1);
-  var nr = Math.max(0, Math.min(Number(c.qtyNr) || 0, q - (q > 1 ? 1 : 0)));
-  return { nW: Math.max(1, q - nr), nR: nr, k: Math.max(1, q - nr) / q, IrUnit: (c.Ir || 0) / q, PrUnit: (c.Pr || 0) / q };
+  var nr = Math.max(0, Math.floor(Number(c.qtyNr) || 0));
+  return { nW: q, nR: nr, k: 1, IrUnit: (c.Ir || 0) / q, PrUnit: (c.Pr || 0) / q };
 }
+var DRAWN = { w: 0, r: 0 };
 function buildSingleLine() {
   var m = NET();
+  DRAWN.w = 0; DRAWN.r = 0;
   if (!m) return noModelSheet("однолинейная");
   var ktp = isKtp();
   var tAll = CMP();
@@ -118,9 +120,9 @@ function buildSingleLine() {
   function hasRes(c) { return c.feedReserve && c.feedWork && c.feedReserve.sectionId && c.feedReserve.sectionId !== c.feedWork.sectionId; }
   var cols = [];
   (m.sections || []).forEach(function (sec, i) { cols.push({ sec: sec, idx: i, cons: consOfSec(m, sec.id) }); });
-  cols.forEach(function (cl) { cl.resUnits = cl.cons.reduce(function (a, c) { return a + (hasRes(c) ? workSplitV3(c).nR : 0); }, 0); });
-  var colW = 112, x = 40;
-  cols.forEach(function (cl) { cl.x0 = x; cl.w = 74 + (cl.cons.length + cl.resUnits) * (cl.resUnits ? Math.max(56, colW * 0.55) : colW); x += cl.w + 110; });
+  cols.forEach(function (cl) { cl.resUnits = cl.cons.reduce(function (a2, c) { return a2 + nChainOf(c); }, 0); cl.nLines = cl.cons.reduce(function (a2, c) { return a2 + workSplitV3(c).nW; }, 0); });
+  var SLOTW = 44, SLOTR = 66, x = 40;
+  cols.forEach(function (cl) { cl.x0 = x; cl.w = 84 + cl.nLines * SLOTW + cl.resUnits * SLOTR; x += cl.w + 110; });
   var totalW = Math.max(x + 420, 1500);
   var busY = 236, P = { W: totalW, H: 900, els: [] };
   function e(o) { P.els.push(o); }
@@ -147,7 +149,7 @@ function buildSingleLine() {
     Ln(P, [x0 + 8, busY], [x1, busY], 9);
     var IrSec = cl.sec.id === "SEC-UPS" ? ((src && src.Sn_kVA) || 10) * 1000 / (1.717 * 400) : SrW * 1000 / (1.717 * 400);
     var resOnSec = 0;
-    cols.forEach(function (oc) { oc.cons.forEach(function (c) { if (hasRes(c) && c.feedReserve.sectionId === cl.sec.id) { resOnSec += (c.Pr || 0) * (1 - workSplitV3(c).k); } }); });
+    cols.forEach(function (oc) { oc.cons.forEach(function (c) { if (hasRes(c) && c.feedReserve.sectionId === cl.sec.id) { var spx2 = workSplitV3(c); resOnSec += (spx2.nR || 1) * spx2.PrUnit; } }); });
     T(P, x0 + 24 + (cl.w - 46) / 2, busY - 26, secRoleV3(cl.sec, i) + "   ΣPр(раб)=" + f1(PrW) + " кВт · Iр=" + f0(IrSec) + " А" + (resOnSec > 0.05 ? " · рез.вх." + f1(resOnSec) + " кВт" : ""), { size: 9.5, bold: true, align: "middle" });
     T(P, x1 - 2, busY - 38, "Iкз(3)=" + f1(Ikz) + " кА; iуд=" + Iud + " кА", { size: 7, align: "end", color: "#33465e" });
     var drop = x0 + 46;
@@ -198,28 +200,36 @@ function buildSingleLine() {
     T(P, mx - 14, busY + 65, "АВР t=0,5…10 с", { size: 5.8, align: "end", color: "#1b6ef3" });
   }
   /* фидеры */
-  var laneGap = 4, kmNo = 0;
+  var laneGap = 4, kmNo = 0, maxRail = 0;
   cols.forEach(function (cl) {
-    var usedLines = cl.cons.length + cl.resUnits;
-    var slotW = (cl.w - 92) / Math.max(1, usedLines);
-    var fxp = cl.x0 + 60;
-    cl.placed = {};
+    cl.unitAcc = 0;
     cl.cons.forEach(function (c, j) {
       var sp = workSplitV3(c);
-      var fx = fxp; c._x = fx; fxp += slotW;
+      var fx0 = cl.x0 + 60 + cl.unitAcc * SLOTW + SLOTW / 2;
+      var groupR = fx0 + (sp.nW - 1) * SLOTW;
+      c._x = fx0 + (sp.nW - 1) * SLOTW / 2;
+      var groupLX = fx0 - 14;
       var catTxt = c.category === "special" ? "особая гр." : "Кат. " + "I".repeat(Number(c.category) || 3);
-      Ln(P, [fx, busY], [fx, busY + 12]); Nd(P, fx, busY);
-      symQFa(P, fx, busY + 24, "QF" + (101 + idxOf(c)), qfIn(c.Ir * sp.k) + " А · " + phLabel(c) + (c.phases === 1 ? (c.phase ? " " + c.phase : "") : ""), catTxt + " · N=" + sp.nW);
-      Ln(P, [fx, busY + 40], [fx, busY + 54], 1.3);
-      T(P, fx - 14, busY + 84, (c.name || "").slice(0, 20), { size: 7 });
-      T(P, fx - 14, busY + 99.5, phLabel(c) + (c.motor ? "·ЭД" : "") + (sp.nR ? " · рез. " + sp.nR + " шт" : ""), { size: 6.6, color: c.phases === 1 ? "#b26a00" : "#33465e" });
-      T(P, fx - 14, busY + 115, f1(c.Pr * sp.k) + " кВт · " + f0(c.Ir * sp.k) + " А", { size: 6.6 });
+      for (var u = 0; u < sp.nW; u++) {
+        var fx = cl.x0 + 60 + cl.unitAcc * SLOTW + SLOTW / 2; cl.unitAcc += 1; DRAWN.w += 1;
+        Ln(P, [fx, busY], [fx, busY + 12]); Nd(P, fx, busY);
+        symQFa(P, fx, busY + 24, "QF" + (101 + idxOf(c)) + (sp.nW > 1 ? "-" + (u + 1) : ""), qfIn(sp.IrUnit) + " А · " + phLabel(c), catTxt + (sp.nW > 1 && u === 0 ? " · N=" + sp.nW + " шт" : ""));
+        Ln(P, [fx, busY + 40], [fx, busY + (sp.nW > 1 ? 136 : 54)], 1.3);
+      }
+      var nm = (c.name || "").slice(0, 20);
+      if (sp.nW > 1) {
+        Ln(P, [fx0, busY + 136], [groupR, busY + 136], 1.3);
+        T(P, c._x, busY + 128, "×" + sp.nW + " · " + f1(c.Pr) + " кВт сум.", { size: 6.2, align: "middle", color: "#33465e" });
+      }
+      T(P, groupLX, busY + 84, sp.nW > 1 ? nm + " ×" + sp.nW + " шт" : nm, { size: 7 });
+      T(P, groupLX, busY + 99.5, phLabel(c) + (c.motor ? "·ЭД" : "") + (nChainOf(c) ? " · рез. " + nChainOf(c) + " шт" : ""), { size: 6.6, color: c.phases === 1 ? "#b26a00" : "#33465e" });
+      T(P, groupLX, busY + 115, (sp.nW > 1 ? "Σ " : "") + f1(c.Pr) + " кВт · " + f0(c.Ir) + " А", { size: 6.6 });
       var cabN = cabForV3(c);
-      T(P, fx - 14, busY + 115, cabN.s ? (cabN.type + " " + cabN.cores + "×" + cabN.s + (cabN.du != null ? " ΔU " + (Math.round(cabN.du * 10) / 10) + "%" : "") + " ·NED") : "каб. —", { size: 6.2, color: "#33465e" });
-      Ln(P, [fx, busY + 54], [fx, busY + 136], 1.3);
-      symRec(P, fx, busY + 144);
-      if (c.category === "special") T(P, fx + 9, busY + 140, "особ.", { size: 6, color: "#c62828" });
-      T(P, fx, busY + 157, "W" + (101 + idxOf(c)), { size: 6, align: "middle", color: "#5a6a7e" });
+      T(P, groupLX, busY + (sp.nW > 1 ? 149 : 127), cabN.s ? (cabN.type + " " + cabN.cores + "×" + cabN.s + "·" + (c.cableLength_m || 30) + "м" + (cabN.du != null ? " ΔU " + (Math.round(cabN.du * 10) / 10) + "%" : "") + " NED") : "каб. —", { size: 6.2, color: "#33465e" });
+      if (sp.nW === 1) { Ln(P, [fx0, busY + 54], [fx0, busY + 136], 1.3); symRec(P, fx0, busY + 144); }
+      else symRec(P, c._x, busY + 144);
+      if (c.category === "special") T(P, c._x + 12, busY + 140, "особ.", { size: 6, color: "#c62828" });
+      T(P, c._x, busY + 157, "W" + (101 + idxOf(c)) + (sp.nW > 1 ? "(" + sp.nW + "×)" : ""), { size: 6, align: "middle", color: "#5a6a7e" });
     });
     /* резервные автоматы: на 2-й (резервной) секции, по одному на единицу Nрез */
     cl.cons.forEach(function (c) {
@@ -227,30 +237,29 @@ function buildSingleLine() {
       var nChain = hasRes(c) ? Math.max(1, sp.nR) : 0;
       if (!nChain) return;
       var target = cols.filter(function (cc) { return cc.sec.id === c.feedReserve.sectionId; })[0];
-      if (!target) return;
+      if (!target) return; target.used = 1;
       target.tRes = (target.tRes || 0);
-      var tLines = target.cons.length + target.resUnits;
-      var tSlotW = (target.w - 92) / Math.max(1, tLines);
       for (var k = 0; k < nChain; k++) {
-        var lrx = target.x0 + 60 + (target.cons.length + target.tRes) * tSlotW + tSlotW * 0.3;
-        target.tRes += 1;
+        var lrx = target.x0 + 60 + target.nLines * SLOTW + target.tRes * SLOTR + SLOTR / 2;
+        target.tRes += 1; DRAWN.r += 1;
         Ln(P, [lrx, busY], [lrx, busY + 10]); Nd(P, lrx, busY);
         e({ t: "l", x1: lrx, y1: busY + 10, x2: lrx - 5, y2: busY + 22, sw: 1.6 });
         e({ t: "r", x: lrx - 4, y: busY + 28, w: 8, h: 4.6, stroke: "#223344", sw: 0.8 });
         e({ t: "l", x1: lrx, y1: busY + 12, x2: lrx, y2: busY + 24, sw: 1.6 });
         e({ t: "l", x1: lrx, y1: busY + 33, x2: lrx, y2: busY + 46, sw: 1.3 });
         T(P, lrx + 7, busY + 20, "QF" + (101 + idxOf(c)) + "р" + (nChain > 1 ? (k + 1) : ""), { size: 6.6, bold: true }); T(P, lrx + 7, busY + 28.5, "рез" + (nChain > 1 ? " " + (k + 1) : ""), { size: 5.2, color: "#1b6ef3" });
-        var yr = target.busYr = (target.busYr || 72) + 13;
+        var yr = target.busYr = (target.busYr || 148) + 18; // ниже всей текстовой зоны фидеров
+        maxRail = Math.max(maxRail, yr);
         Ln(P, [lrx, busY + 46], [lrx, busY + yr], 1.2);
         Ln(P, [lrx, busY + yr], [c._x, busY + yr], 1.2, "#1b6ef3", "7 4");
-        Nd(P, c._x, busY + yr);
-        Ln(P, [c._x, busY + 40], [c._x, busY + yr + 4], 1.3);
+        Ln(P, [c._x, busY + yr], [c._x, busY + 161], 1.2);
+        Nd(P, c._x, busY + 161);
         var kx = (lrx + c._x) / 2;
         kmNo = (kmNo || 0) + 1; void 0;
-        e({ t: "r", x: kx - 11, y: busY + yr - 20, w: 22, h: 12, stroke: "#1b6ef3", sw: 1.2, fill: "#eef4ff" });
-        T(P, kx - 14, busY + yr - 26, "КМ" + kmNo, { size: 5.6, align: "end", bold: true, color: "#1b6ef3" });
-        T(P, kx + 13, busY + yr - 26, "АВР " + f0(qfIn(sp.IrUnit)) + "А", { size: 5.0, color: "#1b6ef3" });
-        Ln(P, [kx - 11, busY + yr - 14], [kx - 20, busY + yr - 14], 0.8, "#1b6ef3", "2 3");
+        e({ t: "r", x: kx - 11, y: busY + yr - 13, w: 22, h: 10, stroke: "#1b6ef3", sw: 1.2, fill: "#eef4ff" });
+        T(P, kx - 14, busY + yr - 16, "КМ" + kmNo, { size: 5.6, align: "end", bold: true, color: "#1b6ef3" });
+        T(P, kx + 13, busY + yr - 16, "АВР " + f0(qfIn(sp.IrUnit)) + "А", { size: 5.0, color: "#1b6ef3" });
+        Ln(P, [kx - 11, busY + yr - 8], [kx - 20, busY + yr - 8], 0.8, "#1b6ef3", "2 3");
       }
     });
   });
@@ -266,7 +275,7 @@ function buildSingleLine() {
   var nx = totalW - 430;
   T(P, nx, 68, "Обозначения и требования (НТД РФ)", { size: 10, bold: true });
   var notes = [
-    "QF101…QF(100+N) — рабочие автоматы по числу потребителей (N); QF…р — дополнительные автоматы каждого резервного приёмника (Nрез) на СЕКЦИИ 2 через КМ местного АВР (эл.+мех. блокировки, ГОСТ 2.755/2.710).",
+    "QF101… — рабочие автоматы: по одному на каждую единицу приёмника (колонка N; при N>1 — QF101-1…-N); QF…р — резервные автоматы по числу Nрез на резервной секции через КМ местного АВР (эл.+мех. блокировки, ГОСТ 2.755/2.710). Колонка «Секция» задаёт принудительную шину потребителя.",
     "Кат. I — автоматическое восстановление питания от двух независимых вводов (ПУЭ п.1.2.14); особая группа — шина ИБП (GB + инвертор VFI, ГОСТ Р 51317.3/IEC 62040).",
     "Резервная мощность в расчёт ΣPр секций не включается (РТМ 36.18.32.4-92). Пусковые токи: самозапуск 1 ЭД — проверять.",
     "1-ф приёмники распределяются по фазам L1/L2/L3 автобалансировкой (колонка «Фаза»), контроль несимметрии — см. Табл.2 (ГОСТ 32144-2013 К2u≤5% ном.; ориентир перекоса ≤30%).",
@@ -278,7 +287,7 @@ function buildSingleLine() {
   var ny = 80;
   notes.forEach(function (nt, ni) { wrapTxt(nt, 76).forEach(function (ln, ii) { T(P, nx + (ii ? 10 : 0), ny, ln, { size: 7.4, color: /ОШИБКА/.test(ln) ? "#c62828" : "#33465e" }); ny += 9.4; }); ny += 4; });
   /* Таблица 1 */
-  var feederBottom = busY + 172;
+  var feederBottom = busY + Math.max(200, maxRail + 40);
   var ty = Math.max(feederBottom, ny + 10) + 26;
   T(P, 20, ty, "Таблица 1 — цепи: приёмники, автоматы (раб./рез.), кабели NED", { size: 11, bold: true });
   var heads = ["№", "Приёмник", "Кат.", "φ", "N", "Nрез", "Pр раб, кВт", "Iр раб, А", "QF раб.", "QF рез. (кажд.)", "Кабель NED", "L,м", "Раб. ввод/секц.", "Рез. ввод/секц."];
@@ -288,7 +297,7 @@ function buildSingleLine() {
     var sp = workSplitV3(c), has = hasRes(c), cabN = cabForV3(c);
     rowsD.push([String(i + 1), (c.name || "").slice(0, 22), c.category === "special" ? "спец" : "I".repeat(Number(c.category) || 3),
       c.phases === 1 ? (c.phase || "авт") : "3~", String(c.qty || 1), sp.nR ? String(sp.nR) : "—",
-      f1(c.Pr * sp.k), f0(c.Ir * sp.k), "QF" + (101 + i) + " " + qfIn(c.Ir * sp.k) + "А", (has && nChainOf(c)) ? ("QF" + (101 + i) + "р " + qfIn(sp.IrUnit) + "А" + (sp.nR > 1 ? " ×" + sp.nR : " ×цепь")) : "—",
+      f1(c.Pr), f0(c.Ir), sp.nW > 1 ? ("QF" + (101 + i) + "-1…" + sp.nW + " · " + qfIn(sp.IrUnit) + "А ×" + sp.nW) : ("QF" + (101 + i) + " " + qfIn(c.Ir * sp.k) + "А"), (has && nChainOf(c)) ? ("QF" + (101 + i) + "р" + (sp.nR > 1 ? "…р" + sp.nR : "") + " " + qfIn(sp.IrUnit) + "А" + (nChainOf(c) > sp.nR ? " (кат.I min 1 цепь)" : "")) : "—",
       cabN.s ? (cabN.cores + "×" + cabN.s) : "—", String(c.cableLength_m || 30),
       c.feedWork ? (c.feedWork.sourceId + "/" + c.feedWork.sectionId) : "—", has ? (c.feedReserve.sourceId + "/" + c.feedReserve.sectionId) : "—"]);
   });
@@ -303,7 +312,7 @@ function buildSingleLine() {
   rowsD.forEach(function (rw, r2) { var ry = tyy + rh * (r2 + 1); grid(ry, ry + rh); var xx = tx0; rw.forEach(function (v, i2) { if (nums[i2]) T(P, xx + cw[i2] - 4, ry + rh - 5.5, v, { size: FS, align: "end" }); else T(P, xx + 3, ry + rh - 5.5, v, { size: FS }); xx += cw[i2]; }); });
   var yy = tyy + rh * (rowsD.length + 2) + 10;
   P.W = Math.max(P.W, tx0 + tot + 60);
-  T(P, 20, yy, "Итого: N приёмников = " + nOp + " ; рабочих QF = " + nOp + " ; резервных QF…р = " + nResTot + " (каждый резервный приёмник — отдельный автомат на 2-й секции). Резервная нагрузка в ΣPр не входит.", { size: 10 });
+  T(P, 20, yy, "Итого: приёмников = " + nOp + " ; рабочих автоматов на листе = " + DRAWN.w + " (=ΣN ✓) ; резервных автоматов QF…р = " + DRAWN.r + " (=Σmax(Nрез,1 по кат.I/II), каждый — отдельный автомат с КМ на резервной секции ✓). Резервная нагрузка в ΣPр не входит (РТМ).", { size: 10 });
   /* Таблица 2 — симметрия по секциям (рабочая) */
   var pbY = yy + 22;
   T(P, 20, pbY, "Таблица 2 — фазная загрузка секций (рабочие нагрузки; ГОСТ 32144-2013, порог перекоса " + (m.imbalanceThresholdPct || 15) + " %, пред. 30 %)", { size: 10, bold: true });
@@ -330,7 +339,8 @@ function buildSingleLine() {
   yy = t2y + 16 * (pbRows.length + 2) + 8;
   T(P, 20, yy, "Перераспределение: 1-ф приёмник с наибольшей загрузкой переносится на недогруженную фазу/секцию при перекосе >30 % (колонка «Фаза»); резервные цепи в перекосе не участвуют.", { size: 9, color: "#33465e" });
   P.W = Math.max(P.W, tx0 + tot2 + 60, nx + 440);
-  P.H = yy + 40;
+  mmSheet(P);
+  P.H = yy + 150; /* запас под основную надпись по ГОСТ 2.1105 (55 мм) + поля рамки */
   mmSheet(P); sheetFrame(P, { title: "Схема электрическая однолинейная · КТП/НКУ · модель " + (m.supplyMode || "2in") }); return P;
 }
 
@@ -353,31 +363,33 @@ function buildPanel() {
     var sec = secById(m, pan.sectionId);
     var role = sec ? secRole(m, sec, 0) : { label: pan.sectionId };
 var cons = (pan.feederIds || []).map(function (id) { return (m.consumers || []).filter(function (c) { return c.id === id; })[0]; }).filter(Boolean);
-    var resUnits = 0; (m.consumers || []).forEach(function (c) { if (c.feedReserve && c.feedWork && c.feedReserve.sectionId === pan.sectionId && c.feedReserve.sectionId !== c.feedWork.sectionId) { var spx = workSplitV3(c); resUnits += spx.nR; } });
+    var units = []; cons.forEach(function (cc2) { var n2 = workSplitV3(cc2).nW; for (var uu = 0; uu < n2; uu++) units.push({ c: cc2, u: uu, n: n2 }); });
+    var resUnits = (pan.resIds || []).length;
     e({ t: "r", x: 24, y: py, w: wpx, h: 150, fill: "#f6faff", stroke: "#223344", sw: 1.3 });
     T(P, 28, py - 6, pan.name + " · секция " + pan.sectionId + (pan.sectionId === "SEC-UPS" ? " · особая гр / ИБП" : pan.sectionId === "SEC-A" ? " · рабочая" : " · резервная") + " · Ш×Г×В = " + (pan.width_disp_mm || pan.width_mm) + "×" + pan.depth_mm + "×" + pan.height_mm + " мм" + (pan.resUnits ? " (вкл. " + pan.resUnits + " рез. мод.)" : ""), { size: 6.8, bold: true });
     e({ t: "r", x: 30, y: py + 12, w: 58, h: 126, stroke: "#98a4b5", sw: 0.8 });
     T(P, 34, py + 26, "Ввод " + role.label, { size: 5 });
     T(P, 34, py + 36, f0((cons.reduce(function (a, c) { return a + (c.Sr || 0); }, 0) * 1000 / 693 || 0)) + " А", { size: 5.6 });
-    var cell = Math.min(64, (wpx - 100) / Math.max(1, cons.length));
-    cons.forEach(function (c, j2) {
+    var cell = Math.min(64, (wpx - 100) / Math.max(1, units.length + resUnits));
+    units.forEach(function (un, j2) { var c = un.c;
       var cx2 = 96 + j2 * cell;
       e({ t: "r", x: cx2, y: py + 12, w: cell - 4, h: 126, stroke: "#98a4b5", sw: 0.8 });
-      T(P, cx2 + 2, py + 24, "QF" + (101 + m.consumers.indexOf(c)), { size: 4.8, bold: true });
+      T(P, cx2 + 2, py + 24, "QF" + (101 + m.consumers.indexOf(c)) + (un.n > 1 ? "-" + (un.u + 1) : ""), { size: 4.8, bold: true });
       T(P, cx2 + 2, py + 33, (val(c.qf, "—")) + "А", { size: 4.8 });
       T(P, cx2 + 2, py + 42, c.phases === 1 ? (c.phase || "авто φ") : "3~", { size: 4.6, color: c.phases === 1 ? "#b26a00" : "#33465e" });
       T(P, cx2 + 2, py + 52, (c.name || "").slice(0, 10), { size: 4.4 });
       if (c.feedReserve) { e({ t: "r", x: cx2 + 2, y: py + 58, w: 12, h: 10, stroke: "#1b6ef3", sw: 0.8 }); T(P, cx2 + 4, py + 66, "А", { size: 4.4, color: "#1b6ef3" }); }
     });
     (pan.resIds || []).forEach(function (rid, j3) {
-      var cxR = 96 + (cons.length + j3) * cell;
+      var cxR = 96 + (units.length + j3) * cell;
       e({ t: "r", x: cxR, y: py + 12, w: cell - 4, h: 126, stroke: "#1b6ef3", sw: 0.9, dash: "6 3" });
       T(P, cxR + 2, py + 24, "QF" + rid, { size: 4.8, bold: true, color: "#1b6ef3" });
       T(P, cxR + 2, py + 33, "резерв", { size: 4.4, color: "#1b6ef3" });
     });
     py += 176;
   });
-  P.H = py + 20;
+  mmSheet(P);
+  P.H = py + 150; /* запас под штамп */
   mmSheet(P); sheetFrame(P, { title: 'Схема структура панелей НКУ' }); return P;
 }
 /* ============ ПЛАНИРОВКА ПО МОДЕЛИ ============ */

@@ -35,6 +35,10 @@
       }
     });
     (st.rows || []).forEach(function (r, i) {
+      var secMap = { A: ['SEC-A', 'V1'], B: ['SEC-B', 'V2'], U: ['SEC-UPS', 'UPS'] };
+      var fwOwn = (r.sec && secMap[r.sec]) ? fwLink(m, secMap[r.sec][1]) : null;
+      var resOwn = null;
+      if (fwOwn && r.sec !== 'U') resOwn = fwLink(m, r.sec === 'B' ? 'V1' : 'V2');
       var c = LC().makeConsumer({
         id: r.netId || ('EP-' + (i + 1)),
         name: r.name,
@@ -57,10 +61,10 @@
         cable: r.cable,
         mode: r.equipMode || 'auto',
         phase: r.phase || null,
-        feedWork: r.fw ? fwLink(m, r.fw) : (r.feedWork || null),
-        feedReserve: r.fr === '-' ? null : (r.fr ? fwLink(m, r.fr) : (r.feedReserve || null)),
-        feedWorkManual: !!r.fw,
-        feedReserveManual: !!(r.fr)
+        feedWork: fwOwn || (r.fw ? fwLink(m, r.fw) : (r.feedWork || null)),
+        feedReserve: (r.fr === '-' || (fwOwn && !resOwn && !(Number(r.nr) > 0) )) ? null : (fwOwn ? (r.fr ? fwLink(m, r.fr) : (resOwn || (r.feedReserve || null))) : (r.fr ? fwLink(m, r.fr) : (r.feedReserve || null))),
+        feedWorkManual: !!(fwOwn || r.fw),
+        feedReserveManual: !!(r.fr) || !!(fwOwn && resOwn)
       });
       m.consumers.push(c);
     });
@@ -77,7 +81,8 @@
     var pb = netModel.phaseBalance || {};
     var hasR = function(c){ return c.feedReserve && c.feedWork && c.feedReserve.sectionId && c.feedReserve.sectionId!==c.feedWork.sectionId; };
     var nRes = (netModel.consumers||[]).filter(hasR).length;
-    var gc = $('gd-counts'); if (gc) gc.textContent = 'QF рабочих: ' + (netModel.consumers||[]).length + ' · QF резервных: ' + nRes;
+    var wU = 0, rU = 0; (netModel.consumers || []).forEach(function (c2) { wU += Math.max(1, Number(c2.qty) || 1); if (c2.feedReserve && c2.feedWork && c2.feedReserve.sectionId !== c2.feedWork.sectionId) rU += Math.max(1, Number(c2.qtyNr) || 0); });
+    var gc = $('gd-counts'); if (gc) gc.textContent = 'QF рабочих (ΣN): ' + wU + ' · QF резервных: ' + rU;
     var src = (netModel.sources || []).map(function (s) { return s.id + '(' + s.type + ')'; }).join(', ');
     var err = (netModel.feedErrors || []).join('<br>') || '\u043d\u0435\u0442';
     box.innerHTML =

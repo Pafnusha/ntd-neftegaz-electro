@@ -163,6 +163,8 @@ function dimV(P, x, y1, y2, label) {
 
 /* ГОСТ 2.1105-2016: рамка (поля 20/5 мм) и основная надпись 185x55 мм; Координаты — в мм после mmSheet */
 function sheetFrame(P, info) {
+  (function () { var my = 0; (P.els || []).forEach(function (e2) { var y2 = e2.t === 'r' ? (e2.y + (e2.h || 0)) : (e2.t === 'l' ? Math.max(e2.y1, e2.y2) : (e2.y || 0)); if (y2 > my) my = y2; });
+    if (my + 62 > +P.H) P.H = Math.ceil(my + 70); })();
   var W = +P.W, H = +P.H, e = function (o) { P.els.push(o); };
   var line = function (x1, y1, x2, y2, sw) { e({ t: "l", x1: x1, y1: y1, x2: x2, y2: y2, sw: sw || 0.35, color: "#223344" }); };
   line(0, 0, W, 0, 0.35); line(W, 0, W, H, 0.35); line(W, H, 0, H, 0.35); line(0, H, 0, 0, 0.35);
