@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Каталог NED-Plagum · ЭС-Нефтегаз</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .filters { display:flex; gap:10px; flex-wrap:wrap; margin:16px 0; }
+    .filters input, .filters select { max-width:280px; }
+    .fam-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; }
+    .fam { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; }
+    .fam h3 { margin:6px 0 8px; font-size:16px; }
+    .fam p { margin:0; color:var(--muted); font-size:13px; line-height:1.45; }
+    .pill { display:inline-block; margin:0 6px 6px 0; font-size:11px; padding:2px 8px; border-radius:999px; background:#213246; color:#c9dcff; }
+    .pill.sn { background:#3a2a12; color:#ffd9a0; }
+    .pill.lv { background:#12353a; color:#9ef0e8; }
+    .pill.flex { background:#1d2d4a; color:#b8d0ff; }
+    .pill.kum { background:#2a1f3a; color:#e0c8ff; }
+    .toolbar-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:8px 0 12px; }
+    .btn { background:var(--accent); color:#1a1200; font-weight:700; border:0; border-radius:10px; padding:10px 14px; text-decoration:none; display:inline-block; cursor:pointer; }
+    .btn2 { background:transparent; color:var(--accent2); border:1px solid var(--accent2); border-radius:10px; padding:9px 14px; text-decoration:none; display:inline-block; }
+    .hidden { display:none !important; }
+    .tblwrap { overflow:auto; max-height:62vh; border:1px solid var(--line); border-radius:12px; }
+    .tblwrap table { min-width:720px; }
+    .warn { color:var(--muted); font-size:12px; margin-top:10px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap head">
+      <div class="brand">
+        <div class="logo">ЭС</div>
+        <div>
+          <h1>ЭС-Нефтегаз</h1>
+          <p>Каталог кабелей NED-Plagum / НЕД-Плагум</p>
+        </div>
+      </div>
+      <nav>
+        <a class="navlink" href="index.html">Главная</a>
+        <a class="navlink active" href="katalog-ned.html">NED-Plagum</a>
+        <a class="navlink" href="ii-v-proekt/raschet-kabelej/">Расчёт кабелей</a>
+        <a class="navlink" href="ntd.html">НТД</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+    <div class="hero">
+      <h2>Каталог NED-Plagum</h2>
+      <p>Марки ооо «НЕД-Пермь» для нефтегаза: силовые SN 6–35 кВ, силовые 0,66/1 кВ с ЭПР, монтажные КУМ и гибкие SERVO. Таблицы сечений и допустимых токов — из базы расчёта кабелей сайта. Перед выпуском ПД сверяйте актуальный каталог завода.</p>
+      <div class="toolbar-row">
+        <a class="btn" href="ii-v-proekt/raschet-kabelej/">Подобрать сечение в калькуляторе</a>
+        <a class="btn2" href="https://ned-perm.ru/products/" target="_blank" rel="noopener">Официальный сайт NED</a>
+      </div>
+    </div>
+
+    <div class="filters">
+      <input id="q" type="search" placeholder="Поиск: SN, SERVO, КУМ, нг(А)-HF, ЭПР…" />
+      <select id="grp">
+        <option value="">Все группы</option>
+        <option value="sn">SN 6–35 кВ</option>
+        <option value="lv">0,66/1 кВ</option>
+        <option value="kum">КУМ монтажные</option>
+        <option value="flex">SERVO / гибкие</option>
+      </select>
+    </div>
+
+    <div id="fams" class="fam-grid"></div>
+
+    <div class="card">
+      <h3 style="margin-top:0">NED-Plagum SN 6–35 кВ · 3× медь, ЭПР</h3>
+      <p class="note">Из базы расчёта: наружный диаметр, масса, допустимый ток в земле/воздухе, R₉₀. Исполнения: <span id="snBuilds"></span></p>
+      <div class="toolbar-row">
+        <label>Напряжение
+          <select id="uclass"></select>
+        </label>
+      </div>
+      <div class="tblwrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Сечение, мм²</th>
+              <th>Ø, мм</th>
+              <th>Масса, кг/км</th>
+              <th>Iдоп земля, А</th>
+              <th>Iдоп воздух, А</th>
+              <th>R₉₀, Ом/км</th>
+            </tr>
+          </thead>
+          <tbody id="snBody"></tbody>
+        </table>
+      </div>
+      <p class="warn">Справочно. Источник цифр — каталог NED-Plagum, заложенный в модуль «Расчёт кабелей». ТУ 3530-001-85082376-2016 / IEC 60502-2.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">Марки 0,66/1 кВ (ЭПР, +90 °C)</h3>
+      <div class="tblwrap">
+        <table>
+          <thead>
+            <tr><th>Марка</th><th>Оболочка</th><th>Броня</th><th>Экран</th><th>Жилы</th><th>Cu / Al</th></tr>
+          </thead>
+          <tbody id="lvBody"></tbody>
+        </table>
+      </div>
+      <p class="warn">ТУ 3530-004-85082376-2016, IEC 60502-1, ГОСТ 31996-2012. Токи для подбора сечения — в калькуляторе (табл. IEC 60364-5-52 / проектная методика).</p>
+    </div>
+  </main>
+  <footer class="wrap">Не является официальным каталогом завода. Проверяйте техлисты NED перед заказом.</footer>
+
+  <script src="ii-v-proekt/raschet-kabelej/assets/data.js"></script>
+  <script src="ii-v-proekt/raschet-kabelej/assets/data-compat.js"></script>
+  <script>
+  var FAMILIES = [
+    {g:"sn", title:"NED-Plagum SN 6–35 кВ", tags:["ЭПР","нг(А)-LS/HF","ХЛ","Вз"], text:"Силовые с изоляцией из этиленпропиленовой резины. U₀/U: 3.6/6 … 20.3/35 кВ. Медь 2/5 класса, возможен алюминий."},
+    {g:"lv", title:"NED-Plagum 0,66/1 кВ ЭПР", tags:["0,66/1 кВ","нг(А)-HF","FRLS","EMS"], text:"Силовые и контрольные с ЭПР, жила +90 °C. Медь и алюминий, экран, ленточная/проволочная броня."},
+    {g:"kum", title:"НЕД-Плагум КУМ", tags:["АСУ","до 0,66 кВ","экран","броня"], text:"Универсальные монтажные для систем автоматизации: индивидуальный/общий экран, броня, нг(А)-LS/HF/ХЛ."},
+    {g:"flex", title:"NED-Plagum SERVO T / TS", tags:["подвижная экспл.","до 1 кВ","1ж/многож"], text:"Кабели для подвижной эксплуатации: SERVO T, SERVO Tнг(А), SERVO TS, SERVO TSнг(А)."},
+    {g:"flex", title:"НЕД-Плагум КГНт / КГт", tags:["гибкие","ХЛ","экран","EMS"], text:"КГНт-ХЛ, КГтнг(А)-ХЛ, КГНЭт-ХЛ, КГЭтнг(А)-ХЛ, КГНСт, КГНЭт-ХЛ EMS."}
+  ];
+
+  function renderFams() {
+    var q = (document.getElementById("q").value || "").toLowerCase();
+    var g = document.getElementById("grp").value;
+    var box = document.getElementById("fams");
+    box.innerHTML = "";
+    FAMILIES.forEach(function (f) {
+      var hay = (f.title + " " + f.text + " " + f.tags.join(" ")).toLowerCase();
+      if (g && f.g !== g) return;
+      if (q && hay.indexOf(q) < 0) return;
+      var el = document.createElement("article");
+      el.className = "fam";
+      el.innerHTML = "<span class=\"pill " + f.g + "\">" + f.g.toUpperCase() + "</span>" +
+        f.tags.map(function (t) { return "<span class=\"pill\">" + t + "</span>"; }).join("") +
+        "<h3>" + f.title + "</h3><p>" + f.text + "</p>";
+      box.appendChild(el);
+    });
+    if (!box.children.length) box.innerHTML = "<p class=\"note\">Ничего не найдено.</p>";
+  }
+
+  function fillSn() {
+    var D = window.DATA || {};
+    var sel = document.getElementById("uclass");
+    var keys = Object.keys(D.sn3 || {});
+    if (!keys.length) {
+      document.getElementById("snBody").innerHTML = "<tr><td colspan=6>База DATA не загрузилась. Откройте страницу через GitHub Pages.</td></tr>";
+      return;
+    }
+    sel.innerHTML = keys.map(function (k) { return "<option value=\"" + k + "\">" + k + " кВ</option>"; }).join("");
+    document.getElementById("snBuilds").textContent = (D.snBuilds || []).map(function (b) { return b.code; }).join(", ");
+    function draw() {
+      var rows = D.sn3[sel.value] || [];
+      document.getElementById("snBody").innerHTML = rows.map(function (r) {
+        return "<tr><td>3×" + r.s + "</td><td>" + r.d + "</td><td>" + r.m + "</td><td>" + r.iz + "</td><td>" + r.ia + "</td><td>" + r.r90 + "</td></tr>";
+      }).join("");
+    }
+    sel.onchange = draw;
+    draw();
+    var lv = document.getElementById("lvBody");
+    lv.innerHTML = (D.lvBrands || []).map(function (b) {
+      return "<tr><td>" + b.code + "</td><td>" + (b.shells || "—") + "</td><td>" + (b.armor || "—") + "</td><td>" + (b.screen || "—") +
+        "</td><td>" + (b.cores || []).join(", ") + "</td><td>" + (b.cu ? "Cu " : "") + (b.al ? "Al" : "") + "</td></tr>";
+    }).join("");
+  }
+
+  document.getElementById("q").addEventListener("input", renderFams);
+  document.getElementById("grp").addEventListener("change", renderFams);
+  renderFams();
+  if (document.readyState === "complete") fillSn();
+  else window.addEventListener("load", fillSn);
+  setTimeout(fillSn, 400);
+  </script>
+</body>
+</html>
