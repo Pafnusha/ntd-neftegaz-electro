@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Нагрузки 2.0 — автоматизированный расчёт нагрузок и ОЛС НКУ/КТП</title>
+<title>Нагрузки 2.0 — расчёт нагрузок и ОЛС НКУ/КТП</title>
 <style>
 :root{--ink:#1c2733;--mut:#5a6a7e;--line:#d7dfe8;--acc:#1b6ef3;--warn:#b26a00;--bad:#c62828;--ok:#1b8a3f;--bg:#f2f5f9}
 *{box-sizing:border-box}body{margin:0;font:14px/1.45 "Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg)}
@@ -17,18 +17,18 @@ h2{font-size:16px;margin:0 0 8px}h3{font-size:14px;margin:12px 0 6px}
 .toolbar label{display:flex;flex-direction:column;font-size:11px;color:var(--mut);gap:2px}
 input,select{font:13px inherit;padding:3px 6px;border:1px solid var(--line);border-radius:5px;background:#fff;color:var(--ink)}
 button{font:13px inherit;padding:6px 12px;border:1px solid var(--acc);background:#fff;color:var(--acc);border-radius:6px;cursor:pointer}
-button.primary{background:var(--acc);color:#fff}button.warnb{border-color:var(--warn);color:var(--warn)}
+button.primary{background:var(--acc);color:#fff}
 table.grid{border-collapse:collapse;width:100%;font-size:12px}
 table.grid th{background:#12233b;color:#fff;border:1px solid #33475f;padding:4px 6px;font-weight:600;white-space:nowrap;position:sticky;top:0;z-index:2}
 table.grid td{border:1px solid var(--line);padding:2px 5px;background:#fff;vertical-align:middle}
 table.grid td input[type=text]{width:170px}table.grid td.num{background:#eef3fa;text-align:right;font-variant-numeric:tabular-nums}
-table.grid tr.dragging{opacity:.45}table.grid tr.rowres td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
+table.grid tr.rowres td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
 table.grid tr.rowups td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
 .handle{cursor:grab;color:var(--mut);padding:0 4px;user-select:none}
 .scrollx{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:6px}
 .totgrid{display:flex;flex-wrap:wrap;gap:8px}.tot{border:1px solid var(--line);border-radius:8px;padding:8px 12px;min-width:210px;background:#f8fbff}
 .tot b{display:block;font-size:13px;margin-bottom:4px}.tot .m{font-size:12px;color:#33465e}
-#warnlist li{margin:2px 0}#warnlist .w{color:var(--warn)}#warnlist .e{color:var(--bad);font-weight:600}#warnlist .i{color:var(--mut)}
+#warnlist .w{color:var(--warn)}#warnlist .e{color:var(--bad);font-weight:600}
 .sheetbox{overflow:auto;background:#fff;border:1px solid var(--line);border-radius:6px}
 .note{font-size:12px;color:var(--mut)}kbd{background:#e8eef6;border:1px solid #c9d5e3;border-radius:4px;padding:0 5px;font-size:11px}
 footer.foot{max-width:1560px;margin:0 auto;padding:8px 14px 40px;font-size:11px;color:var(--mut)}
@@ -47,92 +47,63 @@ footer.foot{max-width:1560px;margin:0 auto;padding:8px 14px 40px;font-size:11px;
   <section class="card">
     <h2>Исходные данные объекта</h2>
     <div class="toolbar">
-      <label>Шаблон ОЛС (ТЗ 2.4)
-        <select id="tpl">
-          <option value="A">Вариант А — 2 секции + АВР + ДЭС 0,4 кВ на СЕКЦИИ 2</option>
-          <option value="B">Вариант Б — 3 секции + секционные + ДЭС 10 кВ на СЕКЦИИ 3</option>
-        </select>
-      </label>
+      <label>Шаблон ОЛС<select id="tpl"><option value="A">Вариант А — 2 секции + АВР + ДЭС 0,4 кВ</option><option value="B">Вариант Б — 3 секции + ДЭС 10 кВ</option></select></label>
       <label>Объект<br><input id="obj" style="width:260px" value="Кустовая насосная станция · НКУ 0,4 кВ"></label>
-      <label>Заказчик<br><input id="cust" style="width:180px" value="АО «НТД» · промысел»"></label>
-      <label>Uном сети, кВ <select id="un"><option>0.4</option><option>10</option></select></label>
-      <label>Sкз сети 10 кВ, МВА <input id="skz" type="number" step="5" value="250" style="width:80px"></label>
+      <label>Заказчик<br><input id="cust" style="width:180px" value="АО «НТД»"></label>
+      <label>Uном, кВ <select id="un"><option>0.4</option><option>10</option></select></label>
+      <label>Sкз 10 кВ, МВА <input id="skz" type="number" step="5" value="250" style="width:80px"></label>
       <label>T раб. Sn, кВА <input id="tr1" type="number" value="1000" style="width:80px"></label>
       <label>T рез. Sn, кВА <input id="tr2" type="number" value="1000" style="width:80px"></label>
-      <label>Uк транс, % <input id="uk" type="number" step="0.5" value="6" style="width:60px"></label>
-      <label>ДЭС, кВА (шаблон) <input id="dg" type="number" value="630" style="width:70px"></label>
+      <label>Uк, % <input id="uk" type="number" step="0.5" value="6" style="width:60px"></label>
+      <label>ДЭС, кВА <input id="dg" type="number" value="630" style="width:70px"></label>
       <label>ИБП, кВА <input id="upsn" type="number" value="10" style="width:64px"></label>
-      <label>Табл. Кр (РТМ)
-        <select id="krt"><option value="table1">табл. 1 (по Ki)</option><option value="table2">табл. 2 (по Ki)</option></select>
-      </label>
-      <label>Kо одновременности <input id="ko" type="number" step="0.05" value="0.9" style="width:64px"></label>
+      <label>Табл. Кр <select id="krt"><option value="table1">табл. 1</option><option value="table2">табл. 2</option></select></label>
+      <label>Kо <input id="ko" type="number" step="0.05" value="0.9" style="width:64px"></label>
       <label>cosφ цель <input id="costg" type="number" step="0.01" value="0.95" style="width:64px"></label>
       <label>Кр вручную <input id="krman" type="number" step="0.01" value="1" style="width:64px" disabled></label>
       <label style="justify-content:flex-end"><input type="checkbox" id="krovr"> перекрыв Кр</label>
       <label>Число тр-ров <input id="ntr" type="number" min="1" value="1" style="width:56px"></label>
-      <label>Доп. загрузка тр. <input id="kload" type="number" step="0.05" min="0.3" max="1" value="0.8" style="width:64px"></label>
+      <label>Доп. загрузка <input id="kload" type="number" step="0.05" min="0.3" max="1" value="0.8" style="width:64px"></label>
       <label style="justify-content:flex-end"><input type="checkbox" id="engmode" checked> режим ИНЖЕНЕР</label>
     </div>
-    <p class="note">Расчёт ведут два независимых потока (ТЗ 2.2): рабочие нагрузки — по РТМ 36.18.32.4-92 (n_э, Кр, 1,1·Σ при n_э≤10, Кс); резерв и ИБП — отдельным потоком, в ΣPр узлов не входят, но задают макс. ток для кабеля/автомата (ТЗ, п.4.1).</p>
+    <p class="note">Два потока РТМ 36.18.32.4-92: рабочие — в ΣPр; резерв/ИБП — отдельно, для max- тока кабеля/АВ.</p>
   </section>
-
   <section class="card">
-    <h2>Ведомость нагрузок <span class="note" style="font-weight:400">— интерактивная таблица (ТЗ 2.1). <kbd>Enter</kbd> — ячейка правее/ниже, <kbd>Ctrl</kbd>+<kbd>Enter</kbd> — новая строка, <kbd>Alt</kbd>+<kbd>↑/↓</kbd> — переместить строку, мышью за ⣿ — drag&amp;drop</span></h2>
+    <h2>Ведомость нагрузок</h2>
     <div class="toolbar">
       <button type="button" class="primary" id="b-add">+ Строка</button>
-      <button type="button" id="b-dup">Дублировать последнюю</button>
-      <button type="button" id="b-del">Удалить последнюю</button>
-      <button type="button" id="b-sortname">Сортир. по наименованию</button>
-      <button type="button" id="b-demo">Демо-данные объекта</button>
-      <button type="button" id="b-save">Сохранить JSON</button>
-      <button type="button" id="b-load">Загрузить JSON</button>
+      <button type="button" id="b-dup">Дублировать</button>
+      <button type="button" id="b-del">Удалить</button>
+      <button type="button" id="b-sortname">Сортир. по имени</button>
+      <button type="button" id="b-demo">Демо</button>
+      <button type="button" id="b-save">JSON</button>
+      <button type="button" id="b-load">Загрузить</button>
       <input type="file" id="f-json" accept=".json" hidden>
-      <button type="button" class="primary" id="b-ols">Отрисовать ОЛС (ГОСТ 2.702-2011)</button>
-      <button type="button" id="b-pdf">Лист ОЛС — PDF (А1)</button>
-      <button type="button" id="b-xls">Экспорт Excel (.xls)</button>
-      <button type="button" id="b-doc">Экспорт Word (пояснительная записка)</button>
-      <button type="button" class="primary" id="b-rtmdoc">Word — Ведомость нагрузок РТМ (А3)</button>
+      <button type="button" class="primary" id="b-ols">ОЛС</button>
+      <button type="button" id="b-pdf">PDF ОЛС</button>
+      <button type="button" id="b-xls">Excel</button>
+      <button type="button" id="b-doc">Word</button>
+      <button type="button" class="primary" id="b-rtmdoc">Word РТМ А3</button>
     </div>
     <div class="scrollx"><table class="grid" id="grid"><thead></thead><tbody></tbody></table></div>
     <p class="note" id="grid-foot"></p>
   </section>
-
   <section class="card">
-    <h2>Итоги РТМ по секциям и узлу</h2>
+    <h2>Итоги РТМ</h2>
     <div class="totgrid" id="dash"></div>
     <div class="totgrid" id="tots"></div>
-    <h3>Таблица расчёта нагрузок по РТМ 36.18.32.4-92</h3>
+    <h3>Таблица РТМ 36.18.32.4-92</h3>
     <div class="scrollx" style="max-height:700px" id="rtmtable"></div>
   </section>
-
-  <section class="card">
-    <h2>Нормативный аудит</h2>
-    <div id="audit" class="scrollx"></div>
-  </section>
-
-  <section class="card" id="engpanel">
-    <h2>Режим ИНЖЕНЕР — формулы и источники</h2>
-    <p class="note">Ни одна формула не введена без указания документа. Если методика упрощена — статус «ТРЕБУЕТ ПРОВЕРКИ НОРМАТИВНОЙ БАЗЫ».</p>
-    <div id="eng-body"></div>
-  </section>
-
-  <section class="card">
-    <h2>Предупреждения и проверки проекта (ТЗ 2.3, п.4)</h2>
-    <ul id="warnlist" class="note"></ul>
-  </section>
-
-  <section class="card" id="sheetcard" hidden>
-    <h2>Однолинейная схема (ОЛС)</h2>
-    <div class="sheetbox" id="sheetbox"></div>
-  </section>
+  <section class="card"><h2>Нормативный аудит</h2><div id="audit" class="scrollx"></div></section>
+  <section class="card" id="engpanel"><h2>Режим ИНЖЕНЕР</h2><p class="note">Формулы только с источником. КЗ — ТРЕБУЕТ ПРОВЕРКИ НОРМАТИВНОЙ БАЗЫ.</p><div id="eng-body"></div></section>
+  <section class="card"><h2>Предупреждения</h2><ul id="warnlist" class="note"></ul></section>
+  <section class="card" id="sheetcard" hidden><h2>ОЛС</h2><div class="sheetbox" id="sheetbox"></div></section>
 </main>
-<footer class="foot">
-
-  НТД: РТМ 36.18.32.4-92; ПУЭ гл. 1.2, 1.3, 7; ГОСТ 2.702-2011, ГОСТ 2.755/2.710/2.721/2.751 (УГО), ГОСТ 2.1105 (форма); ГОСТ 32144-2013 (перекос ≤30 %); разъяснения ВНИИПО (огнестойкость трасс СПЗ — индекс «-FR», лоток с символом огнестойкости).
-  Токи КЗ — упрощённый расчёт (по ТЗ 2.3), финальные значения подтверждать расчётом РЗ. Приложение работает полностью в браузере (он-прем/офлайн режим по ТЗ 3 — достаточно скопировать папку на внутренний сервер).
-</footer>
+<footer class="foot">РТМ 36.18.32.4-92; ПУЭ гл. 1.2, 1.3; ГОСТ 2.702-2011; ГОСТ 32144-2013. Токи КЗ — упрощённый расчёт, уточнять РЗ.</footer>
 <script src="loads-gost.js?v=4"></script>
 <script src="loads-ned.js?v=2"></script>
-<script src="nagruzki2.js?v=6"></script>
+<script src="nagruzki2.a.js?v=6"></script>
+<script src="nagruzki2.b.js?v=6"></script>
 </body>
 </html>
