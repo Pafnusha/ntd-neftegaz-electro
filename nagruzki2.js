@@ -266,6 +266,23 @@ function paintWarns() {
 }
 function works() { return state.rows.filter(function (r) { return r.kind === "work"; }); }
 
+function renderRtmTable() {
+  var el = $("rtmtable"); if (!el) return;
+  var byId = {}; APP.res.rowsById.forEach(function (c) { byId[c.id] = c; });
+  var h = "<table class='grid' style='font-size:12px'><thead><tr><th>Секция / поток</th><th>Поз.</th><th>Наименование</th><th>n</th><th>Pн.ед</th><th>Pн, кВт</th><th>Ki</th><th>cosφ</th><th>tgφ</th><th>Ki·Pн</th><th>Q,квар</th><th>n·P².ед</th></tr></thead><tbody>";
+  SECS.forEach(function (sname) {
+    var sc = APP.secCalc[sname]; var g = sc.g; if (!g || !g.Pn) return;
+    var p = sc.p || {};
+    h += "<tr><th colspan='12' style='background:#e8eef6;text-align:left'>СЕКЦИЯ " + sname.slice(-1) + " — рабочий поток РТМ: ΣPн=" + f1(g.Pn) + " · ΣKiPн=" + f1(g.KiPn) + " · n_э=" + f1(g.ne) + " · Ki_ср=" + f1(g.kiAvg) + " · tgφ=" + f1(g.tgAvg) + " · Кр=" + f1(p.kr || 0) + (g.ne <= 10.01 ? " (1,1Σ при n_э≤10)" : "") + " → Pр=<b>" + f1(p.Pp || 0) + "</b> · Qр=" + f1(p.Qp || 0) + " · Sр=" + f1(p.Sp || 0) + " кВА · Iр=" + f0((p.Sp || 0) * 1000 / (1.732 * 400)) + " А · Q_КУ=" + f0(p.Qcu || 0) + " квар</th></tr>";
+    state.rows.filter(function (r) { return r.sec === sname && r.kind === "work"; }).forEach(function (r) {
+      var c = byId[r.id], tg = tgFromCos(r.cosPhi);
+      h += "<tr><td></td><td>W" + (201 + state.rows.indexOf(r)) + "</td><td>" + esc(r.name) + "</td><td>" + r.n + "</td><td>" + f1(r.pnUnit) + "</td><td>" + f1(c.Pn) + "</td><td>" + f1(r.ki) + "</td><td>" + f1(r.cosPhi) + "</td><td>" + f1(tg) + "</td><td>" + f1(c.Pr) + "</td><td>" + f1(c.Qr) + "</td><td>" + f0(r.n * r.pnUnit * r.pnUnit) + "</td></tr>";
+    });
+    if (sc.pRes) h += "<tr><td></td><td colspan='11' style='color:var(--warn)'>Резервный поток (в ΣPр не входит): ΣPрез=" + f1(sc.gRes.KiPn) + " кВт · Sрез=" + f1(sc.pRes.Sp) + " кВА — сечения/автоматы по max(Iраб,Iрез)</td></tr>";
+    if (sc.gUps.Pn) h += "<tr><td></td><td colspan='11' style='color:var(--bad)'>Поток ИБП: ΣP=" + f1(sc.gUps.KiPn) + " кВт — от шины ИБП, в ΣPр не входит</td></tr>";
+  });
+  el.innerHTML = h + "</tbody></table>";
+}
 function readConf() {
   return {
     tpl: $("tpl").value, un: Number($("un").value), skz: Number($("skz").value), tr: Number($("tr1").value), tr2: Number($("tr2").value), uk: Number($("uk").value),
@@ -278,7 +295,7 @@ function recalc() {
   conf.__base = faultBase(conf);
   APP.conf = conf;
   runCalc(conf);
-  paintCells(); paintTotals(); paintWarns();
+  paintCells(); paintTotals(); paintWarns(); renderRtmTable();
   APP.sheetBuilt = false;
 }
 function faultBase(conf) {
@@ -425,144 +442,231 @@ function buildOls() {
   var SECSN = conf.tpl === "A" ? 2 : 3;
   function consOf(i) { return state.rows.filter(function (r) { return r.sec === "Секция " + i; }); }
   var P1 = { W: 2100, H: 900, els: [] }; P = P1;
-  var busY = 210, topY = 56;
-  T2d(16, 26, "Схема электрическая однолинейная (ОЛС) — " + (conf.tpl === "A" ? "вариант А: 2 секции, АВР, ДЭС 0,4 кВ на СЕКЦИИ 2" : "вариант Б: 3 секции, секционные выключатели, ДЭС 10 кВ с ТЗ на СЕКЦИИ 3"), { size: 11, bold: true });
-  T2d(16, 36, "ГОСТ 2.702-2011 (С1); УГО ГОСТ 2.755/2.710/2.721/2.751/2.710; цвет: основной — чёрный, резерв/ИБП — оранжевый пунктир; СПЗ — огнелоток и индекс -FR (ВНИИПО)", { size: 5.2, color: "#33465e" });
-  T2d(16, 44, "Блокировки вводов и секционного аппарата — электрическая+механическая («&&»/замок). Iкз — упрощённый расчёт, уточнить расчётом РЗ.", { size: 5.2, color: "#33465e" });
-  var geo = {}, x0 = 30, UPSX = null;
-  var slotWork = 30, slotRes = 42;
+  var busY = 250, topY = 64;
+  var FS0 = 8.5 /* базовый чертёжный (на бумаге А1 после ×0,5 и вписывания ≥ 2,5…3,5 мм по ГОСТ 2.304) */;
+  T2d(16, 30, "Схема электрическая однолинейная (ОЛС) — " + (conf.tpl === "A" ? "вариант А: 2 секции + АВР + ДЭС 0,4 кВ на СЕКЦИИ 2" : "вариант Б: 3 секции + секционные выключатели + ДЭС 10 кВ через ТЗ на СЕКЦИИ 3"), { size: 16, bold: true });
+  T2d(16, 44, "Исполнение по ГОСТ 2.702-2011 (тип С1); УГО: ГОСТ 2.755 (выключатели), 2.710 (цепи/блокировки), 2.721 (трансформаторы), 2.751 (перем. контакты), 2.722 (ток/нагрузка); шрифты — ГОСТ 2.304 серии 5/3.5/2.5", { size: FS0, color: "#33465e" });
+  T2d(16, 54, "Основные цепи — сплошная основная линия; резервные и ИБП — штриховые (оранжевый/красный); цепи СПЗ — штриховая линия огнестойкого лотка и индекс «-FR» (разъяснения ВНИИПО); блокировки вводов/секционных — замки «(Э)/(М)»", { size: FS0, color: "#33465e" });
+  var geo = {}, x0 = 24, UPSX = null;
+  var slotWork = 72, slotRes = 86;
   [1, 2, 3].forEach(function (i) {
-    if (i > SECSN) return;
+    if (i > (conf.tpl === "A" ? 2 : 3)) return;
     var wRows = consOf(i).filter(function (r) { return r.kind !== "reserve"; });
     var rRows = consOf(i).filter(function (r) { return r.kind === "reserve"; });
     var g = { cons: wRows, res: rRows, x0: x0 };
-    g.w = 64 + wRows.length * slotWork + rRows.length * slotRes + (i <= 2 ? 0 : 40);
-    geo[i] = g; x0 += g.w + 26;
+    g.w = 130 + wRows.length * slotWork + rRows.length * slotRes;
+    geo[i] = g; x0 += g.w + 34;
   });
-  var upsRows = conf.tpl === "A" ? state.rows.filter(function (r) { return r.kind === "ups"; }) : [];
-  if (conf.tpl === "A") { var uu = state.rows.filter(function (r) { return r.kind === "ups"; }); if (uu.length) { UPSX = { x0: x0, cons: uu, w: 64 + uu.length * 34 }; x0 += UPSX.w + 10; } }
-  var totalW = Math.max(x0 + 330, 1400);
-  P1.W = totalW;
-  /* вводы */
-  function feedTop(i) {
-    var g = geo[i], cx = g.x0 + 34, bx1 = g.x0 + 6, bx2 = g.x0 + g.w - 6;
-    L2(cx, topY + 8, cx, busY - 14, 1.6);
-    if (i === 1) { T2d(cx - 30, topY, "Сеть 10(6) кВ; Sк.з=" + conf.skz + " МВА", { size: 5 }); C2(cx - 4, topY + 14, 5); C2(cx + 7, topY + 14, 3.4); T2d(cx + 7, topY + 15.3, "A", { size: 3, align: "middle" }); T2d(cx - 12, topY + 16, "TA1", { size: 4, align: "end" }); L2(cx - 8, topY + 22, cx, topY + 34, 1.2); symTR2(cx, topY + 46, "T1", conf.tr + " кВА · 10(6)/0,4 · Ук=" + conf.uk + "%"); L2(cx, topY + 56, cx, busY - 14, 1.6); symQFsmall(cx - 9, busY - 34, "QF01", false); }
-    else if (i === 2 && conf.tpl === "A") { T2d(cx - 26, topY, "ДЭС 0,4 кВ · " + conf.dg + " кВА (АВР, т.п. 600 об/мин)", { size: 5 }); L2(cx, topY + 6, cx, topY + 26, 1.6); C2(cx, topY + 32, 6); T2d(cx, topY + 34, "Г", { size: 5, align: "middle", bold: true }); symQFsmall(cx - 9, topY + 52, "QF02", false); L2(cx, topY + 88, cx, busY - 14, 1.6); }
-    else if (i === 2) { T2d(cx - 30, topY, "Сеть 10(6) кВ (рез. ввод)", { size: 5 }); C2(cx - 4, topY + 12, 5); C2(cx + 7, topY + 12, 3.4); L2(cx - 8, topY + 18, cx, topY + 30, 1.2); symTR2(cx, topY + 42, "T2", conf.tr2 + " кВА · Ук=" + conf.uk + "%"); symQFsmall(cx - 9, busY - 34, "QF03", false); L2(cx, busY - 14, cx, busY - 14, 0); }
-    else { T2d(cx - 30, topY, "ДЭС 10 кВ · " + conf.dg + " кВА → ТЗ 10/0,4", { size: 5, color: "#b26a00" }); C2(cx, topY + 30, 6); T2d(cx, topY + 32, "Г", { size: 5, align: "middle", bold: true, color: "#b26a00" }); L2(cx, topY + 36, cx, topY + 42, 1.6, "#b26a00"); symTR2(cx, topY + 52, "T3", conf.dg + " кВА · 10/0,4", "#b26a00"); L2(cx, topY + 62, cx, busY - 14, 1.6, "#b26a00"); symQFsmall(cx - 9, busY - 34, "QF05", true); }
-    L2(bx1, busY, bx2, busY, 5);
-    T2d(cx, busY - 6, "СЕКЦИЯ " + i + " · 0,4 кВ", { size: 6.2, bold: true, align: "middle" });
-    Nd(cx, busY);
-  }
+  var upsTop = state.rows.filter(function (r) { return r.kind === "ups"; });
+  if (conf.tpl === "A" && upsTop.length) { UPSX = { x0: x0, cons: upsTop, w: 118 + upsTop.length * slotWork }; x0 += UPSX.w + 10; }
+  P1.W = Math.max(x0 + 180, 1500);
   function symTR2(cx, cy, name, txt, col) {
-    col = col || "#223344"; C2(cx - 5, cy, 6.5, col); C2(cx + 5, cy, 6.5, col);
-    T2d(cx - 14, cy + 2, name, { size: 5, bold: true, align: "end", color: col });
-    var w1 = txt.length * 2.4 + 6; T2d(cx + 14, cy + 1, txt, { size: 3.8, color: col }); void w1;
+    col = col || "#223344"; C2(cx - 7, cy, 9, col); C2(cx + 7, cy, 9, col);
+    T2d(cx - 19, cy + 3, name, { size: 10, bold: true, align: "end", color: col });
+    var ls = wrapTxt(String(txt), 16);
+    ls.forEach(function (ln, li) { T2d(cx + 20, cy - 4 + li * 9, ln, { size: FS0, color: col }); });
   }
+  function feedTop(i) {
+    var g = geo[i], cx = g.x0 + 42, bx1 = g.x0 + 6, bx2 = g.x0 + g.w - 6;
+    if (i === 1) {
+      T2d(cx - 14, topY + 4, "Сеть 10(6) кВ, Sк.з.=" + conf.skz + " МВА", { size: FS0, align: "end" });
+      L2(cx, topY - 6, cx, topY + 14, 1.6);
+      C2(cx - 7, topY + 20, 8); C2(cx + 8, topY + 20, 5); T2d(cx + 8, topY + 22, "A", { size: 6, align: "middle" });
+      T2d(cx - 18, topY + 24, "TA1", { size: FS0, bold: true, align: "end" });
+      L2(cx - 2, topY + 30, cx, topY + 44, 1.4);
+      symTR2(cx, topY + 58, "T1", conf.tr + " кВА · 10(6)/0,4 · Y/D · Ук" + conf.uk + "%");
+      L2(cx, topY + 72, cx, busY - 26, 1.6);
+      symQFsmall(cx - 12, busY - 60, "QF01", false); T2d(cx - 26, busY - 44, qfInI(conf.tr) + " А · 4P·LSI", { size: FS0, align: "end" });
+      Nd(cx, busY);
+    } else if (i === 2 && conf.tpl === "A") {
+      T2d(cx - 14, topY + 4, "ДЭС 0,4 кВ · " + conf.dg + " кВА · cosφ 0,8", { size: FS0, align: "end", color: "#b26a00" });
+      L2(cx, topY + 8, cx, topY + 26, 1.6, "#b26a00");
+      C2(cx, topY + 34, 9, "#b26a00"); T2d(cx, topY + 37, "Г", { size: 9, align: "middle", bold: true, color: "#b26a00" });
+      L2(cx, topY + 43, cx, busY - 60, 1.6, "#b26a00", "6 3");
+      symQFsmall(cx - 12, busY - 46, "QF02", true); T2d(cx - 26, busY - 30, qfInI(conf.dg) + " А · 4P", { size: FS0, align: "end", color: "#b26a00" });
+      Nd(cx, busY);
+    } else if (i === 2) {
+      T2d(cx - 14, topY + 4, "Сеть 10(6) кВ (рез.)", { size: FS0, align: "end" });
+      C2(cx - 7, topY + 16, 8); C2(cx + 8, topY + 16, 5);
+      L2(cx - 2, topY + 24, cx, topY + 38, 1.4);
+      symTR2(cx, topY + 54, "T2", conf.tr2 + " кВА · Ук" + conf.uk + "%");
+      L2(cx, topY + 68, cx, busY - 60, 1.6);
+      symQFsmall(cx - 12, busY - 46, "QF03", false);
+      Nd(cx, busY);
+    } else {
+      T2d(cx - 14, topY + 4, "ДЭС 10 кВ · " + conf.dg + " кВА", { size: FS0, align: "end", color: "#b26a00" });
+      L2(cx, topY + 8, cx, topY + 22, 1.6, "#b26a00");
+      C2(cx, topY + 30, 9, "#b26a00"); T2d(cx, topY + 33, "Г", { size: 9, align: "middle", bold: true, color: "#b26a00" });
+      L2(cx, topY + 39, cx, topY + 48, 1.6, "#b26a00");
+      symTR2(cx, topY + 62, "T3", conf.dg + " кВА · 10/0,4", "#b26a00");
+      L2(cx, topY + 76, cx, busY - 52, 1.6, "#b26a00", "6 3");
+      symQFsmall(cx - 12, busY - 40, "QF05", true);
+      Nd(cx, busY);
+    }
+    L2(bx1, busY, bx2, busY, 5.5);
+    T2d(cx + (bx2 - bx1) / 2 - 42, busY - 10, "СЕКЦИЯ " + i + " · 0,4 кВ", { size: 11, bold: true, align: "middle" });
+    var ss = APP.secCalc["Секция " + i];
+    if (ss && ss.p) T2d(bx2 - 4, busY - 10, "ΣPр=" + f1(ss.p.Pp) + " кВт · Sр=" + f1(ss.p.Sp) + " кВА", { size: FS0, align: "end", color: "#33465e" });
+    if (conf.un === 10 || (geo[1] && i === 1)) {}
+  }
+  function qfInI(kva) { return pickQf(kva * 1000 / (1.732 * 400)); }
   [1, 2, 3].forEach(function (i) { if (geo[i]) feedTop(i); });
-  if (UPSX) { var ux = UPSX.x0 + 24; T2d(UPSX.x0, topY, "ИБП (VFI) " + (conf.ups || 10) + " кВА", { size: 5, bold: true, color: "#c62828" }); R2d(ux - 16, topY + 6, 32, 16, "#c62828", "#fdf1f1"); T2d(ux, topY + 16, "VFI·SS1", { size: 4, align: "middle", color: "#c62828" }); L2(ux, topY + 22, ux, busY + 54, 1.3, "#c62828"); R2d(ux - 12, busY + 54, 24, 7, "#c62828"); Nd(ux, busY + 61); }
-  /* АВР/секционные + блокировки */
-  if (conf.tpl === "A") {
-    var a = geo[1].x0 + geo[1].w - 6, b = geo[2].x0 + 6, mx = (a + b) / 2;
-    L2(a, busY, b, busY, 3.2);
-    L2(mx, busY, mx, busY + 12, 1.5); symQFsmall2(mx, busY + 12, "QF11");
-    L2(mx, busY + 30, mx, busY, 0);
-    symATS(mx + 26, busY + 16); lockSym(mx - 11, busY + 22);
-    T2d(mx, busY + 44, "секционный + АВР (эл.+мех. блокировка)", { size: 4.2, align: "middle", color: "#1b6ef3" });
-  } else {
-    [[1, 2, "QF11"], geo[2] && geo[3] ? [2, 3, "QF12"] : null].filter(Boolean).forEach(function (p2) {
-      var g1 = geo[p2[0]], g2 = geo[p2[1]]; var a = g1.x0 + g1.w - 6, b = g2.x0 + 6, mx = (a + b) / 2;
-      L2(a, busY, b, busY, 3.2);
-      L2(mx, busY, mx, busY + 12, 1.5); symQFsmall2(mx, busY + 12, p2[2]); lockSym(mx - 11, busY + 20);
-      T2d(mx, busY + 36, "секционный " + p2[2], { size: 4.2, align: "middle", color: "#1b6ef3" });
+  if (UPSX) {
+    var ux = UPSX.x0 + 42;
+    T2d(ux, topY - 6, "ИБП VFI · " + (conf.ups || 10) + " кВА", { size: 9.5, bold: true, align: "middle", color: "#c62828" });
+    R2d(ux - 26, topY + 2, 52, 24, "#c62828", "#fdf1f1"); T2d(ux, topY + 17, "VFI · SS1", { size: FS0, align: "middle", color: "#c62828" });
+    L2(ux, topY + 26, ux, busY + 72, 1.5, "#c62828", "6 3");
+    L2(ux - 16, busY + 72, ux + 16, busY + 72, 3, "#c62828");
+    T2d(ux + 20, busY + 66, "шина ИБП", { size: FS0, color: "#c62828" });
+    Nd(ux, busY + 72, "#c62828");
+  }
+  if (conf.tpl === "A" && geo[1] && geo[2]) {
+    var a0 = geo[1].x0 + geo[1].w - 6, a1 = geo[2].x0 + 6, mx = (a0 + a1) / 2;
+    L2(a0, busY, a1, busY, 3.4);
+    L2(mx, busY, mx, busY + 10, 1.6); symQFsmall2(mx, busY + 10, "QF11");
+    symATS(mx + 46, busY + 20); lockSym(mx - 16, busY + 26);
+    T2d(mx, busY + 60, "секционный QF11 + АВР (Э)/(М)", { size: FS0, align: "middle", color: "#1b6ef3" });
+  } else if (conf.tpl === "B") {
+    [[1, 2, "QF11"], [2, 3, "QF12"]].forEach(function (p2) {
+      var g1 = geo[p2[0]], g2 = geo[p2[1]]; if (!g1 || !g2) return;
+      var a0 = g1.x0 + g1.w - 6, a1 = g2.x0 + 6, mx = (a0 + a1) / 2;
+      L2(a0, busY, a1, busY, 3.4);
+      L2(mx, busY, mx, busY + 10, 1.6); symQFsmall2(mx, busY + 10, p2[2]);
+      lockSym(mx - 16, busY + 26); T2d(mx, busY + 46, "секционный " + p2[2] + " (Э)/(М)", { size: FS0, align: "middle", color: "#1b6ef3" });
     });
-    if (geo[2]) { var m2 = (geo[1].x0 + geo[1].w + geo[2].x0) / 2; symATS(m2, busY + 58); T2d(m2, busY + 72, "АВР секц.1–2", { size: 4, align: "middle", color: "#1b6ef3" }); }
+    if (geo[1]) { var m2 = geo[1].x0 + geo[1].w / 2; symATS(m2, busY + 64); T2d(m2, busY + 82, "АВР секции 1–2", { size: FS0, align: "middle", color: "#1b6ef3" }); }
   }
   function symQFsmall2(x, y, label) {
-    L2(x, y, x, y + 4, 1.4); L2(x, y + 4, x + 4.5, y + 11, 1.5); R2d(x - 3.2, y + 7, 3.4, 3.4, "#223344", "#fff"); L2(x, y + 11, x, y + 16, 1.4); T2d(x - 5, y + 8.5, label, { size: 4.4, align: "end", bold: true });
+    L2(x, y, x, y + 6, 1.6); L2(x, y + 6, x + 7, y + 17, 1.7); R2d(x - 5, y + 11, 5.4, 5.4, "#223344", "#fff"); L2(x, y + 17, x, y + 26, 1.6);
+    T2d(x - 8, y + 15, label, { size: 8.5, align: "end", bold: true });
   }
-  /* фидеры */
-  var feedMaxBot = busY;
-  function drawConn(cx, r) {
-    var y = busY + 8, isRes = r.kind === "reserve", isUps = r.kind === "ups";
-    var col = isRes ? "#e67e22" : isUps ? "#c62828" : "#223344";
-    L2(cx, busY, cx, y + 2, 1.2, "#223344");
-    Nd(cx, busY);
-    symQFsmall(cx, y + 2, "QF" + (201 + state.rows.indexOf(r)), isRes || isUps);
-    var yy = y + 34;
-    var c = byId[r.id];
-    L2(cx, y + 20, cx, yy + 10, 1.2, col, (isRes || isUps) ? "3.2 2" : null);
-    if (r.spz) { fireTray(cx, y + 24, 14); T2d(cx + 3.2, y + 33, "огнелоток", { size: 2.8, color: "#c62828" }); }
-    T2d(cx + 4, yy, escPh(r), { size: 3.6, color: col, align: "start" });
-    T2d(cx + 4, yy + 5, (c.mark || "").slice(0, 18), { size: 3.5, color: "#33465e" });
-    if (r.motor) mSym(cx, yy + 15, "М " + f0(r.pnUnit) + "кВт");
-    else { R2d(cx - 7, yy + 11, 14, 7, col, "#fff"); T2d(cx, yy + 15.8, "Н", { size: 4, align: "middle" }); }
-    var nm = String(r.name || "").slice(0, 15);
-    T2d(cx + 4, yy + 24, nm + (r.n > 1 ? " ×" + r.n : ""), { size: 3.8, color: col });
-    var pair = r.kind === "work" ? state.rows.filter(function (p2) { return p2.kind !== "work" && p2.name === r.name; })[0] : null;
-    if (r.kind === "work" && pair) T2d(cx + 4, yy + 29, "рез: QF" + (201 + state.rows.indexOf(pair)) + " · С" + pair.sec.replace(/[^123]/g, ""), { size: 3.4, color: "#b26a00" });
-    feedMaxBot = Math.max(feedMaxBot, yy + 34);
-  }
+  var feedMaxBot = busY + 90;
   function escPh(r) { if (String(r.ph) === "1~220") return "1~ " + APP.phaseAssign[r.id]; return "3~"; }
+  function drawConn(cx, r) {
+    var c = byId[r.id];
+    var isRes = r.kind === "reserve", isUps = r.kind === "ups";
+    var col = isRes ? "#e67e22" : isUps ? "#c62828" : "#223344";
+    L2(cx, busY, cx, busY + 14, 1.4, col); Nd(cx, busY, col);
+    var qfY = busY + 16;
+    L2(cx - 2, qfY + 16, cx - 2, qfY + 30, 1.4, col);
+    L2(cx - 2, qfY + 30, cx + 5, qfY + 44, 1.5, col);
+    R2d(cx - 8.5, qfY + 37.5, 5.5, 5.5, col, "#fff");
+    L2(cx - 2, qfY + 44, cx - 2, qfY + 58, 1.4, col, (isRes || isUps) ? "6 3" : null);
+    var qn = "QF" + (201 + state.rows.indexOf(r));
+    T2d(cx - 2, qfY + 8, qn, { size: 8.2, align: "middle", bold: true, color: col });
+    T2d(cx - 12, qfY + 30, "In=" + c.In + " А", { size: FS0, align: "end", color: col });
+    if (String(r.ph) === "1~220") T2d(cx - 12, qfY + 40, "1~" + APP.phaseAssign[r.id], { size: FS0, align: "end", color: "#e07b00" });
+    else T2d(cx - 12, qfY + 40, "отс." + c.trip + "·In", { size: 8, align: "end", color: "#33465e" });
+    var lineY = qfY + 58, lineH = 34;
+    L2(cx - 2, lineY, cx - 2, lineY + lineH, 1.4, col, (isRes || isUps) ? "6 3" : null);
+    if (r.spz) { fireTray(cx, lineY + 2, lineH - 6); T2d(cx + 6, lineY + 12, "лоток огнестойкий, -FR", { size: 7.5, color: "#c62828" }); }
+    var yL = lineY + lineH + 8;
+    if (r.motor) { C2(cx, yL + 8, 8); T2d(cx, yL + 11, "M", { size: 9, align: "middle", bold: true }); yL += 20; T2d(cx, yL, "Pн=" + f1(r.pnUnit) + " кВт·Кп" + (r.kp || 7), { size: FS0, align: "middle" }); yL += 9; }
+    else { R2d(cx - 9, yL, 18, 11, col, "#fff"); T2d(cx, yL + 8, "H", { size: 9, align: "middle", bold: true }); yL += 19; }
+     var nm = String(r.name || "").slice(0, 26);
+    var nl = wrapTxt(nm, Math.max(9, Math.floor(56 / (FS0 * 0.55))));
+    nl.forEach(function (ln, li) { T2d(cx, yL + 3 + li * 8.6, ln, { size: FS0, align: "middle", bold: li === 0, color: (isRes || isUps) ? col : "#223344" }); });
+    yL += 4 + nl.length * 8.6;
+    T2d(cx, yL, "W" + (201 + state.rows.indexOf(r)) + " · " + f1(c.Pr) + " кВт", { size: FS0, align: "middle", bold: true }); yL += 8.6;
+    T2d(cx, yL, "Iр=" + f0(c.Icalc) + " А · S=" + c.s + " мм²", { size: 8, align: "middle" }); yL += 8.6;
+    var mtag = /FRLS/.test(c.mark) ? "нг(А)-FRLS" : (c.mark.indexOf("ВБ") >= 0 ? "ВБШв" : "ВВГнг-LS");
+    var core = (String(r.ph) === "1~220" || r.kind === "ups") ? "3×" : "5×";
+    T2d(cx, yL, mtag + " " + core + c.s + " · L" + r.L + "м", { size: 8, align: "middle", color: "#33465e" }); yL += 8.6;
+    T2d(cx, yL, "ΔU=" + f1(c.du) + " % · Iкз=" + f1(c.I1end / 1000) + " кА", { size: 8, align: "middle", color: (c.okDu && c.okTrip) ? "#1b8a3f" : "#c62828" }); yL += 8.6;
+    if (isRes) {
+      var wrow = works().filter(function (p2) { return p2.name === r.name; })[0];
+      T2d(cx, yL, "резерв " + (wrow ? "к W" + (201 + state.rows.indexOf(wrow)) : "цепь"), { size: 8, align: "middle", color: "#b26a00" }); yL += 8.6;
+    }
+    if (isUps && r.spz) T2d(cx, yL, "СПЗ АУПТ/СОУЭ", { size: 8, align: "middle", color: "#c62828" });
+    feedMaxBot = Math.max(feedMaxBot, yL + 12);
+  }
   [1, 2, 3].forEach(function (i) {
     var g = geo[i]; if (!g) return;
-    var xx = g.x0 + 44;
+    var xx = g.x0 + 56 + slotWork / 2;
     g.cons.forEach(function (r) { drawConn(xx, r); xx += slotWork; });
-    g.res.forEach(function (r) {
-      drawConn(xx, r);
-      var wrow = works().filter(function (p2) { return p2.name === r.name; })[0];
-      if (wrow) {
-        /* штриховой перенос резерва к рабочей цепи (пункт ТЗ 2.4 — оба пути на ОЛС) */
-        var gi = null; [1, 2, 3].forEach(function (i2) { if (geo[i2] && geo[i2].cons.indexOf(wrow) >= 0) gi = i2; });
-      }
-      xx += slotRes;
-    });
+    g.res.forEach(function (r) { drawConn(xx, r); xx += slotRes; });
   });
-  if (UPSX) { var xx2 = UPSX.x0 + 12; UPSX.cons.forEach(function (r) { drawConn2(xx2, r); xx2 += 34; }); }
-  function drawConn2(cx, r) {
-    var c = byId[r.id]; var y = busY + 61;
-    L2(UPSX.x0 + 24, y, cx, y, 1.2, "#c62828");
-    symQFsmall(cx, y + 2, "QF" + (201 + state.rows.indexOf(r)), true);
-    L2(cx, y + 20, cx, y + 32, 1.2, "#c62828", "3.2 2");
-    T2d(cx + 4, y + 38, escPh(r), { size: 3.6, color: "#c62828" });
-    T2d(cx + 4, y + 43, (c.mark || "").slice(0, 15), { size: 3.4, color: "#33465e" });
-    R2d(cx - 7, y + 13 + 22, 14, 7, "#c62828", "#fff"); T2d(cx, y + 38.8, "Н", { size: 4, align: "middle" });
-    T2d(cx + 4, y + 48, String(r.name || "").slice(0, 14), { size: 3.7, color: "#c62828" });
-    if (r.spz) fireTray(cx, y + 22, 12);
-    feedMaxBot = Math.max(feedMaxBot, y + 52);
+  if (UPSX) {
+    var xx2 = UPSX.x0 + 34 + slotWork / 2;
+    UPSX.cons.forEach(function (r) {
+      var y = busY + 72; L2(r === UPSX.cons[0] ? xx2 - 0 : xx2, y, xx2, y, 1.5, "#c62828");
+      Nd(xx2, y, "#c62828");
+      drawConnAt(xx2, r, y);
+      xx2 += slotWork;
+    });
+    function drawConnAt(cx, r, startY) {
+      var c = byId[r.id];
+      L2(cx, startY, cx, startY + 14, 1.4, "#c62828", "6 3");
+      var qfY = startY + 14;
+      L2(cx - 2, qfY + 16, cx - 2, qfY + 30, 1.4, "#c62828");
+      L2(cx - 2, qfY + 30, cx + 5, qfY + 44, 1.5, "#c62828");
+      R2d(cx - 8.5, qfY + 37.5, 5.5, 5.5, "#c62828", "#fff");
+      L2(cx - 2, qfY + 44, cx - 2, qfY + 66, 1.4, "#c62828", "6 3");
+      T2d(cx - 12, qfY + 42, "QF" + (201 + state.rows.indexOf(r)), { size: 9, align: "end", bold: true, color: "#c62828" });
+      T2d(cx - 12, qfY + 52, "In=" + c.In + " А", { size: FS0, align: "end", color: "#c62828" });
+      var yL = qfY + 66;
+      R2d(cx - 9, yL + 2, 18, 11, "#c62828", "#fff"); T2d(cx, yL + 10, "H", { size: 9, align: "middle", bold: true });
+      var nm = String(r.name || "").slice(0, 26);
+      wrapTxt(nm, 9).forEach(function (ln, li) { T2d(cx, yL + 22 + li * 8.6, ln, { size: FS0, align: "middle", color: "#c62828" }); });
+      var yL2 = yL + 24 + wrapTxt(nm, 9).length * 8.6;
+      T2d(cx, yL2 + 4, "ИБП · " + f1(c.Pr) + " кВт · " + f0(r.L) + " м · -FR", { size: 8, align: "middle", color: "#c62828" });
+      feedMaxBot = Math.max(feedMaxBot, yL2 + 12);
+    }
   }
-  /* таблица спецификации + итоги */
-  var ty = feedMaxBot + 18;
-  T2d(14, ty, "Таблица 1 — расчётно-спецификационная ведомость цепей", { size: 7.5, bold: true });
-  var heads = ["№", "Наименование", "Тип", "Кат", "φ", "Секц", "n", "Pн_ед", "Pн", "Ki", "cos", "Iрасч", "S,L,кабель", "ΔU", "QF (отсечка)", "Iкз1ф кл.", "СПЗ"];
-  var cx2 = [], xx3 = 14;
+  /* ===== Таблица 1 — расчётно-спецификационные цепи ===== */
+  var ty = feedMaxBot + 34;
+  T2d(14, ty, "Таблица 1 — расчётно-спецификационные цепи (по строкам ведомости нагрузок)", { size: 12, bold: true });
+  var heads = ["№", "Наименование цепи (ЭП)", "Тип", "Кат", "φ/U", "Секц", "n", "Pн, кВт", "Ki", "Iр, А", "кабель S·L, марка", "ΔU", "QF (In·отс)", "Iкз1ф кл. кА", "СПЗ"];
   var rowsD = state.rows.map(function (r, i) {
     var c = byId[r.id];
-    return [String(i + 1), String(r.name).slice(0, 24), r.kind === "work" ? "раб" : r.kind === "reserve" ? "рез" : "ИБП", r.cat, String(r.ph).replace("~", ""), r.sec.replace("Секция ", "С"), String(r.n), f1(r.pnUnit), f1(c.Pn), f1(r.ki), f1(r.cosPhi), f0(c.Icalc), c.s + "мм²·" + r.L + "м·" + c.mark.split(" ").slice(0, 1), f1(c.du) + "%", "QF" + (201 + i) + " " + c.In + "A·" + c.trip, f1(c.I1end / 1000) + " кА", r.spz ? "FR" : "—"];
+    return [String(i + 1), String(r.name).slice(0, 30), r.kind === "work" ? "раб" : r.kind === "reserve" ? "рез" : "ИБП", r.cat, String(r.ph).replace("~", ""), r.sec.replace("Секция ", "С"), String(r.n), f1(c.Pn), f1(r.ki), f0(c.Icalc), c.s + " мм²·" + r.L + " м·" + c.mark, f1(c.du) + (c.okDu ? " ✓" : " ✗"), c.In + "×" + c.trip, f1(c.I1end / 1000), r.spz ? "-FR" : "—"];
   });
-  var colw = heads.map(function (h3, i3) { var w = Math.max(String(h3).length, 4) * 2.6 + 6; rowsD.forEach(function (rw) { var w2 = String(rw[i3]).length * 2.6 + 5; if (w2 > w) w = w2; }); return Math.min(w, 120); });
+  var FS1 = 9;
+  function cwid(s) { return String(s).length * FS1 * 0.62 + 10; }
+  var colw = heads.map(function (h3, i3) { var w = cwid(h3); rowsD.forEach(function (rw) { var w2 = cwid(rw[i3]); if (w2 > w) w = w2; }); return Math.min(Math.max(w, 30), 300); });
   var tw3 = colw.reduce(function (a2, b2) { return a2 + b2; }, 0);
-  rowsD.forEach(function (rw) { var w = String(rw[1]).length * 2.6 + 6; if (w > colw[1]) colw[1] = Math.min(w, 130); });
-  P1.W = Math.max(P1.W, 340 + tw3);
-  function gridRows(yT) {
-    L2(14, yT, 14 + tw3, yT, 0.5, "#223344"); L2(14, yT - 8, 14, yT, 0.5); L2(14 + tw3, yT - 8, 14 + tw3, yT, 0.5);
-    var q = 14; colw.forEach(function (w) { L2(q, yT - 8, q, yT, 0.4); q += w; });
-    L2(q, yT - 8, q, yT, 0.5);
-  }
-  P1.W = Math.max(P1.W, 340 + tw3); void cx2;
-  gridRows(ty + 8 + 3);
-  (function () { var q = 14; heads.forEach(function (h3, i3) { T2d(q + 2, ty + 9, h3, { size: 3.9, bold: true }); q += colw[i3]; }); })();
-  rowsD.forEach(function (rw, ri) { var ry2 = ty + 8 + 3 + (ri + 1) * 10; gridRows(ry2); var q = 14; rw.forEach(function (v, i3) { T2d(q + 2, ry2 - 3, v, { size: 3.8 }); q += colw[i3]; }); });
-  var yb = ty + 8 + 3 + (rowsD.length + 1) * 10 + 10;
-  SECS.forEach(function (sname, si) {
-    var s = APP.secCalc[sname]; if (!s || !s.p) return;
-    T2d(14, yb + si * 9, sname + ": Pр=" + f1(s.p.Pp) + " кВт · Qр=" + f1(s.p.Qp) + " квар · Sр=" + f1(s.p.Sp) + " кВА · n_э=" + f1(s.g.ne) + (s.g.ne <= 10.01 ? " (<10 → 1,1)" : "") + " · Кр=" + f1(s.p.kr) + " · Q_ку=" + f0(s.p.Qcu) + " квар", { size: 5.2 });
+  P1.W = Math.max(P1.W, 24 + tw3 + 60);
+  var tyy = ty + 16, rh = 17;
+  function gridT(yT, yB) { var q = 14; for (var qq = 0; qq <= colw.length; qq++) { L2(q, yT, q, yB, 0.7); if (qq < colw.length) q += colw[qq]; } L2(14, yT, 14 + tw3, yT, 0.8); L2(14, yB, 14 + tw3, yB, 0.8); }
+  gridT(tyy, tyy + rh);
+  (function () { var q = 14; heads.forEach(function (h3, i3) { T2d(q + 3, tyy + 12, h3, { size: FS1, bold: true }); q += colw[i3]; }); })();
+  rowsD.forEach(function (rw, ri) { var ry2 = tyy + rh * (ri + 1); gridT(ry2, ry2 + rh); var q = 14; rw.forEach(function (v, i3) { T2d(q + 3, ry2 + 12, v, { size: FS1, color: i3 === 11 && /✗/.test(v) ? "#c62828" : (i3 === 12 && /✗/.test(String(rw[11])) ? "#c62828" : "#223344") }); q += colw[i3]; }); });
+  var yy = tyy + rh * (rowsD.length + 1) + 14;
+  /* ===== Таблица 2 — расчёт по РТМ 36.18.32.4-92 (пояс нагрузки) ===== */
+  T2d(14, yy, "Таблица 2 — расчёт электрических нагрузок по РТМ 36.18.32.4-92 (рабочий поток; резерв и ИБП — отдельными строками в ΣPр не входят)", { size: 12, bold: true });
+  var h4 = ["Секция/поток", "поз.", "Наименование", "n", "Pн.ед кВт", "Pн кВт", "Ki", "cosφ", "tgφ", "KiPн кВт", "Q кв.", "n·Pн.ед²"];
+  var rws = [];
+  SECS.forEach(function (sname) {
+    var g = (APP.secCalc[sname] || {}).g; if (!g || !g.Pn) return;
+    rws.push(["СЕКЦИЯ " + sname.slice(-1) + " — рабочий", "", "— итого по секции: ΣPн=" + f1(g.Pn) + "; ΣKiPн=" + f1(g.KiPn) + "; ΣnP²=" + f0(g.sumNPn2) + "; n_э=" + f1(g.ne) + "; Ki_ср=" + f1(g.kiAvg) + "; tgφ_ср=" + f1(g.tgAvg) + "; Кр=" + f1((APP.secCalc[sname].p || {}).kr), "", "", "", "", "", "", "", "", "", ""]);
+    state.rows.filter(function (r) { return r.sec === sname && r.kind === "work"; }).forEach(function (r, k) {
+      var c = byId[r.id]; var tg = tgFromCos(r.cosPhi);
+      rws.push(["", "W" + (201 + state.rows.indexOf(r)), String(r.name).slice(0, 34), String(r.n), f1(r.pnUnit), f1(c.Pn), f1(r.ki), f1(r.cosPhi), f1(tg), f1(c.Pr), f1(c.Qr), f0(Math.max(0, r.n * r.pnUnit * r.pnUnit))]);
+    });
+    var p = APP.secCalc[sname].p;
+    if (p && isFinite(p.Pp)) rws.push(["", "", "Pр=Кр·ΣKiPн=" + f1(p.Pp) + " кВт; Qр=" + f1(p.Qp) + " квар" + ((APP.secCalc[sname].g.ne <= 10.01 && APP.secCalc[sname].g.ne > 0) ? " (1,1·Σ при n_э≤10)" : "") + "; Sр=" + f1(p.Sp) + " кВА; Iр=" + f0(p.Sp * 1000 / (1.732 * 400)) + " А; Q_КУ=" + f0(p.Qcu) + " квар", "", "", "", "", "", "", "", "", "", ""]);
+    var gr = APP.secCalc[sname].gRes; if (gr.Pn) rws.push(["резервный поток", "", "ΣPрез(Ki·Pн)=" + f1(gr.KiPn) + " кВт; в ΣPр не входит; сечения/автоматы — по max(Iраб,Iрез)", "", "", "", "", "", "", "", "", ""]);
+    var gu = APP.secCalc[sname].gUps; if (gu.Pn) rws.push(["поток ИБП", "", "ΣP(ИБП)=" + f1(gu.KiPn) + " кВт — от шины ИБП (VFI)", "", "", "", "", "", "", "", "", ""]);
   });
-  var ysrc = yb + SECSN * 9 + 8;
-  T2d(14, ysrc, "К.З.: Iкз.3ф(шины)=" + f1(APP.conf.__base.I3 / 1000) + " кА · iуд=" + f1(APP.conf.__base.iud / 1000) + " кА · T1 " + conf.tr + " кВА Ук" + conf.uk + "% · Sкз сети " + conf.skz + " МВА (упрощённо, ПУЭ гл.1.3; чувствительность — см. Табл.1).", { size: 5.2, color: "#33465e" });
-  T2d(14, ysrc + 8, "Резервный поток ΣPрез=" + f1((APP.secCalc["Секция 1"] && APP.secCalc["Секция 1"].gRes.KiPn || 0) + ((APP.secCalc["Секция 2"] || {}).gRes ? APP.secCalc["Секция 2"].gRes.KiPn : 0) + ((APP.secCalc["Секция 3"] || {}).gRes ? APP.secCalc["Секция 3"].gRes.KiPn : 0)) + " кВт на ОЛС — оранжевым пунктиром, в ΣPр секций не входит (РТМ 36.18.32.4-92; ПУЭ 1.2.14 — питание кат.I от двух независимых вводов).", { size: 5, color: "#b26a00" });
-  P1.H = ysrc + 90;
+  var FS2 = 9;
+  function cwid2(s) { return String(s).length * FS2 * 0.62 + 10; }
+  var colw2 = h4.map(function (h3, i3) { var w = cwid2(h3); rws.forEach(function (rw) { var w2 = cwid2(rw[i3]); if (w2 > w) w = w2; }); return Math.min(Math.max(w, 44), 430); });
+  var tw4 = colw2.reduce(function (a2, b2) { return a2 + b2; }, 0);
+  P1.W = Math.max(P1.W, 24 + tw4 + 60);
+  var t2y = yy + 16, rh2 = 16.5;
+  function gridT2(yT, yB) { var q = 14; for (var qq = 0; qq <= colw2.length; qq++) { L2(q, yT, q, yB, 0.6); if (qq < colw2.length) q += colw2[qq]; } L2(14, yT, 14 + tw4, yT, 0.7); L2(14, yB, 14 + tw4, yB, 0.7); }
+  gridT2(t2y, t2y + rh2);
+  (function () { var q = 14; h4.forEach(function (h3, i3) { T2d(q + 3, t2y + 11, h3, { size: FS2, bold: true }); q += colw2[i3]; }); })();
+  rws.forEach(function (rw, ri) {
+    var ry2 = t2y + rh2 * (ri + 1); gridT2(ry2, ry2 + rh2); var q = 14;
+    var secRow = !!rw[0];
+    rw.forEach(function (v, i3) { T2d(q + 3, ry2 + 10.5, v, { size: FS2, bold: secRow && i3 < 3, color: secRow ? "#0b3d69" : "#223344" }); q += colw2[i3]; });
+  });
+  var ys = t2y + rh2 * (rws.length + 1) + 16;
+  T2d(14, ys, "Токи КЗ (упрощённо): Iкз.3ф.шин = " + f1(conf.__base.I3 / 1000) + " кА; iуд = " + f1(conf.__base.iud / 1000) + " кА; Sк.з сети = " + conf.skz + " МВА; Т " + conf.tr + " кВА Ук " + conf.uk + " %. Отключающая способность ≥ 50 кА; чувствительность — по Табл.1 (1,25·Iотс).", { size: FS0, color: "#33465e" });
+  T2d(14, ys + 11, "Резервные нагрузки и ИБП в ΣP_node не суммируются (РТМ). Кат. I восстановл. автоматически от двух невзаимозависимых вводов с АВР (ПУЭ 1.2.14). Кабели СПЗ — ВВГнг(А)-FRLS в огнестойких лотках (ВНИИПО).", { size: FS0, color: "#b26a00" });
+  T2d(14, ys + 22, "Примечания к ОЛС: (Э)/(М) — электрическая/механическая блокировка; «Г» — синхронный генератор ДЭС; «M» — двигатель; «H» — нагрузка (линейка); W2xx — позиция по ведомости; 1~L2 — фаза однофазной цепи (автобалансировка).", { size: FS0, color: "#33465e" });
+  P1.H = ys + 40;
   if (window.mmSheet) mmSheet(P1);
   if (window.sheetFrame) sheetFrame(P1, { title: "ОЛС НКУ/КТП — вариант " + conf.tpl + " (Нагрузки 2.0)" });
   APP.P = P1; APP.sheetBuilt = true;
@@ -575,9 +679,12 @@ function renderOls() {
 }
 
 /* ===== SECTION:export ===== */
-function download(name, mime, text) {
-  var a = document.createElement("a"), u = "data:" + mime + ";charset=utf-8," + encodeURIComponent(text);
-  a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+function download(name, mime, content) {
+  var blob = content instanceof Blob ? content : new Blob([content], { type: mime + ";charset=utf-8" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a"); a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 8000);
 }
 function xlsEsc(v) { return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
 function exportXls() {
@@ -608,7 +715,21 @@ function exportXls() {
   var xml = '<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?>' +
     '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">' +
     '<Styles><Style ss:ID="b"><Font ss:Bold="1"/></Style></Styles>' +
-    sheet("Ведомость нагрузок", head, rows) + sheet("Итоги РТМ", ["Группа", "Pр кВт", "Qр квар", "Sр кВА"], t1) + sheet("Спецификация МТР", ["Наименование", "1", "2", "3"], spec) + "</Workbook>";
+    sheet("Ведомость нагрузок", head, rows) + sheet("Расчёт РТМ", ["Секция/поток","Поз","Наименование","n","Pн ед","Pн","Ki","cos","tg","KiPн","Q","nP²"], (function () {
+    var out = [], byId2 = {}; APP.res.rowsById.forEach(function (c) { byId2[c.id] = c; });
+    SECS.forEach(function (sname) {
+      var sc = APP.secCalc[sname], g = sc.g, p = sc.p || {};
+      if (!g || !g.Pn) return;
+      out.push(["СЕКЦИЯ " + sname.slice(-1), "", "ΣPн=" + f1(g.Pn) + "; ΣKiPн=" + f1(g.KiPn) + "; n_э=" + f1(g.ne) + "; Кр=" + f1(p.kr || 0) + "; Pр=" + f1(p.Pp || 0) + "; Qр=" + f1(p.Qp || 0) + "; Sр=" + f1(p.Sp || 0) + "; Qку=" + f0(p.Qcu || 0), "", "", "", "", "", "", "", "", ""]);
+      state.rows.filter(function (r) { return r.sec === sname && r.kind === "work"; }).forEach(function (r) {
+        var c = byId2[r.id], tg = tgFromCos(r.cosPhi);
+        out.push([sname, "W" + (201 + state.rows.indexOf(r)), r.name, r.n, r.pnUnit, c.Pn, r.ki, r.cosPhi, f1(tg), c.Pr, c.Qr, f0(r.n * r.pnUnit * r.pnUnit)]);
+      });
+      if (sc.pRes) out.push([sname + " резерв", "", "ΣPрез=" + f1(sc.gRes.KiPn) + " кВт (в ΣPр не входит; max-ток на кабель)", "", "", "", "", "", "", "", "", ""]);
+      if (sc.gUps.Pn) out.push([sname + " ИБП", "", "ΣP=" + f1(sc.gUps.KiPn) + " кВт (шина ИБП)", "", "", "", "", "", "", "", "", ""]);
+    });
+    return out;
+  })()) + sheet("Итоги РТМ", ["Группа", "Pр кВт", "Qр квар", "Sр кВА"], t1) + sheet("Спецификация МТР", ["Наименование", "1", "2", "3"], spec) + "</Workbook>";
   download("nagruzki2-vedomost.xls", "application/vnd.ms-excel", xml);
 }
 function exportDoc(svgPng) {
@@ -629,7 +750,9 @@ function exportDoc(svgPng) {
     var s = APP.secCalc[sname]; if (!s || !s.p) return;
     body += "<tr><td>" + sname + "</td><td>" + f1(s.g.Pn) + "</td><td>" + f1(s.g.KiPn) + "</td><td>" + f1(s.g.ne) + "</td><td>" + f1(s.g.kiAvg) + "</td><td>" + f1(s.p.kr) + "</td><td><b>" + f1(s.p.Pp) + "</b></td><td>" + f1(s.p.Qp) + "</td><td>" + f1(s.p.Sp) + "</td><td>" + f0(s.p.Qcu) + "</td><td>" + f1((APP.skew[sname] || {}).skew || 0) + "</td></tr>";
   });
-  body += "</table><p>Резервные нагрузки и нагрузки ИБП в ΣPр не включаются (РТМ), используются для выбора сечений/автоматов по max-току и для схем АВР.</p>";
+  body += '</table><h2>3.1. Ведомость расчёта по РТМ (позиции W — как на ОЛС)</h2><table><tr><th>Поз</th><th>Наименование</th><th>Секция</th><th>n</th><th>Pн,кВт</th><th>Ki</th><th>cosφ</th><th>Ki·Pн,кВт</th><th>Q,квар</th></tr>';
+  body += state.rows.filter(function (r) { return r.kind === "work"; }).map(function (r) { var c = (APP.res.rowsById.filter(function (x) { return x.id === r.id; })[0] || {}); return "<tr><td>W" + (201 + state.rows.indexOf(r)) + "</td><td>" + esc(r.name) + "</td><td>" + r.sec + "</td><td>" + r.n + "</td><td>" + f1(c.Pn) + "</td><td>" + f1(r.ki) + "</td><td>" + f1(r.cosPhi) + "</td><td>" + f1(c.Pr) + "</td><td>" + f1(c.Qr) + "</td></tr>"; }).join("");
+  body += "</table><p>Резервные нагрузки и нагрузки ИБП в ΣPр не включаются (РТМ), используются для выбора сечений/автоматов по max-току и для схем АВР; сводка по секциям (n_э, Кр, 1,1-коэф., Q_КУ) — таблица раздела 3.</p>";
   body += "<h2>4. Однолинейная схема</h2>";
   if (svgPng) body += '<img src="' + svgPng + '" style="width:100%"/>';
   body += "<h2>5. Спецификация оборудования (МТР, укрупнённо)</h2><table><tr><th>Позиция</th><th>Тип/номинал</th><th>Кол.</th></tr>";
@@ -716,9 +839,16 @@ function wire() {
   $("b-doc").onclick = function () {
     if (!APP.sheetBuilt) renderOls();
     if (window.svgSheetToJpeg) {
-      svgSheetToJpeg(APP.P, 2, function (jpg, w, h) {
-        var png = jpg ? "data:image/jpeg;base64," + btoa(String.fromCharCode.apply(null, (function () { var out = []; for (var i = 0; i < jpg.length; i++) out.push(jpg[i]); return out; })())) : null;
-        exportDoc(png);
+      svgSheetToJpeg(APP.P, 1.6, function (jpg) {
+        var uri = null;
+        if (jpg) {
+          try {
+            var CH2 = 8192, sb = "";
+            for (var off = 0; off < jpg.length; off += CH2) sb += String.fromCharCode.apply(null, jpg.subarray(off, Math.min(off + CH2, jpg.length)));
+            uri = "data:image/jpeg;base64," + btoa(sb);
+          } catch (e) { uri = null; }
+        }
+        exportDoc(uri);
       });
     } else exportDoc(null);
   };
