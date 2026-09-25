@@ -1,0 +1,11 @@
+:root{--ink:#1c2733;--mut:#5a6a7e;--line:#d7dfe8;--acc:#1b6ef3}
+*{box-sizing:border-box}body{margin:0;font:15px/1.55 "Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:#f2f5f9}
+header.top{background:#12233b;color:#fff;display:flex;gap:16px;align-items:center;padding:10px 18px;flex-wrap:wrap}
+header.top .brand{font-weight:700}header.top a{color:#bcd3f5;text-decoration:none;font-size:13px}header.top a.cur{color:#fff;font-weight:600}
+main{max-width:880px;margin:18px auto 60px;padding:0 14px}
+h1{font-size:24px}h2{font-size:17px;margin:0 0 10px}p.sub{color:var(--mut);font-size:14px}
+section.card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-bottom:14px}
+pre{background:#0e1c30;color:#dce9f7;border-radius:8px;padding:10px 12px;overflow:auto;font-size:13px}
+code{background:#e8eef6;border-radius:4px;padding:0 5px;font-size:.92em}pre code{background:none;padding:0;color:inherit}
+table{border-collapse:collapse;width:100%;font-size:14px}td,th{border:1px solid var(--line);padding:6px 9px;vertical-align:top}th{background:#eef3fa;text-align:left}
+.note{font-size:13px;color:var(--mut)}footer{max-width:880px;margin:0 auto 50px;padding:0 14px;color:var(--mut);font-size:13px}

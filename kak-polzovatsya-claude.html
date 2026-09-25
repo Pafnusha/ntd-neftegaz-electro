@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Как пользоваться Claude Code (FCC) — НТД Нефтегаз Электрика</title>
+<link rel="stylesheet" href="kak-polzovatsya-claude.css">
+</head>
+<body>
+<header class="top">
+  <span class="brand">НТД · Нефтегаз Электрика</span>
+  <a href="index.html">Главная</a>
+  <a href="loads.html">Нагрузки</a>
+  <a href="nagruzki2.html">Нагрузки 2.0</a>
+  <a href="ibp.html">ИБП</a>
+  <a class="cur" href="kak-polzovatsya-claude.html">Claude Code</a>
+</header>
+<main>
+<h1>Как пользоваться Free Claude Code в этом проекте</h1>
+<p class="sub">Claude Code — агент в терминале: читает и правит файлы папки, запускает тесты и git.
+Free Claude Code (FCC) — бесплатный переходник, который направляет запросы агента в бесплатные модели
+(NVIDIA NIM, Groq, Gemini, OpenRouter…) вместо платного API Anthropic. Установка один раз на компьютер — дальше агент работает во всех проектах.</p>
+
+<section class="card"><h2>1. Установка (PowerShell, один раз)</h2>
+<pre><code>&amp; ([scriptblock]::Create((irm "https://raw.githubusercontent.com/Alishahryar1/free-claude-code/main/scripts/install.ps1")))</code></pre>
+<p>На вопрос «Install Claude Code?» — <b>Y</b>. Если загрузчик Claude Code выдал <b>403</b> (региональная блокировка claude.ai):</p>
+<pre><code>npm config set prefix $HOME\npm-global
+npm install -g @anthropic-ai/claude-code
+# затем повторить команду установки FCC выше</code></pre>
+<p class="note">Linux/macOS вместо PowerShell:
+<code>curl -fsSL https://raw.githubusercontent.com/Alishahryar1/free-claude-code/main/scripts/install.sh | sh</code></p>
+</section>
+
+<section class="card"><h2>2. Бесплатная модель</h2>
+<ol>
+<li>Заведите ключ на одном из сайтов: <a href="https://build.nvidia.com/settings/api-keys" rel="nofollow">build.nvidia.com</a> (рекомендуется), <a href="https://console.groq.com/keys" rel="nofollow">console.groq.com</a>, <a href="https://aistudio.google.com/apikey" rel="nofollow">aistudio.google.com</a>, <a href="https://openrouter.ai/keys" rel="nofollow">openrouter.ai</a>.</li>
+<li>Запустите «Free Claude Code» (Пуск / трей) → откроется Admin UI.</li>
+<li>Providers → вставьте ключ → выберите MODEL из списка → <b>Apply</b>.</li>
+<li>В Model Config можно включить <b>Fallback Models</b> — автоматический переход на запасную модель при ошибке.</li>
+</ol>
+</section>
+
+<section class="card"><h2>3. Подключение к этому проекту</h2>
+<pre><code>git clone https://github.com/Pafnusha/ntd-neftegaz-electro.git
+cd ntd-neftegaz-electro
+gh auth login        # один раз: доступ git к GitHub
+fcc-claude           # запуск агента в папке проекта</code></pre>
+<p>Первая фраза агенту: <i>«прочитай CLAUDE.md и перескажи правила проекта»</i>. Там описаны: структура модулей,
+обязательная пересборка чанков <code>*.gz.b64</code> после правок <code>loads-draw.js</code>, поднятие версий <code>?v=</code>,
+тесты <code>loads-core/tests</code>, контроль наложений на листах, запрет артефактов в коммитах.
+Права агента ограничены файлом <code>.claude/settings.json</code>: можно читать/править/тестировать,
+коммит и push — только после явного подтверждения.</p>
+</section>
+
+<section class="card"><h2>4. Как ставить задачи (формула: что + где + как проверить)</h2>
+<table>
+<tr><th>Плохо</th><th>Хорошо</th></tr>
+<tr><td>«исправь таблицу»</td><td>«В nagruzki2.js в Таблице 2 добавь колонку Sр(kVA) по секциям; после правок запусти <code>python tests/n2_test.py</code> и покажи, что наложения текста на листе = 0»</td></tr>
+<tr><td>«сделай схему красивой»</td><td>«Проверь однолистную схему loads-draw.js по ГОСТ 2.304: все надписи на бумаге А1 должны быть ≥2,5 мм; подними размеры шрифтов, если меньше; пересобери чанки ; тесты не роняй»</td></tr>
+<tr><td>«найди ошибку»</td><td>«Ведомость РТМ и QF-автомат не сходятся при N=4/Nрез=2: воспроизведи тестом, найди место в loads-draw.js, почини, коммит не делай»</td></tr>
+</table>
+<p class="note">Команды сессии: <code>/model</code> — сменить модель, <code>/status</code> — состояние,
+<code>Esc</code> — прервать, два <code>Ctrl+C</code> — выход. Агент отвечает и пишет код по-русски — просите как коллегу.</p>
+</section>
+
+<section class="card"><h2>5. Безопасность и дисциплина</h2>
+<ul>
+<li>Коммит/пуш — только по вашей команде; перед коммитом читайте <code>git diff</code>.</li>
+<li>Испортили правками — <code>git checkout -- .</code> (откат всей рабочей папки).</li>
+<li>Токены (GitHub PAT, ключи моделей) — не светить в чатах и не хранить в файлах проекта; PAT берите
+fine-grained, только на этот репозиторий.</li>
+<li>Ключи FCC лежат локально в <code>~/.fcc</code> — эта папка вне git.</li>
+</ul>
+</section>
+
+<section class="card"><h2>6. Частые сбои</h2>
+<table><tr><th>Симптом</th><th>Действие</th></tr>
+<tr><td>403 при установке</td><td>npm-обход из шага 1, затем перезапустить установщик FCC</td></tr>
+<tr><td><code>claude</code> не найдена</td><td>добавить <code>%USERPROFILE%\npm-global\bin</code> в PATH или ставить от администратора</td></tr>
+<tr><td>агент молчит / 429</td><td>Admin UI → сменить модель, включить Fallback, проверить лимиты провайдера</td></tr>
+<tr><td>push отклонён</td><td>свежие изменения в main: агенту — «сделай git pull --rebase origin main и повтори push»</td></tr>
+</table>
+</section>
+</main>
+<footer>Проект: <a href="https://pafnusha.github.io/ntd-neftegaz-electro/">ntd-neftegaz-electro</a> · FCC — сторонний open-source (AGPL), не продукт Anthropic.</footer>
+</body>
+</html>
