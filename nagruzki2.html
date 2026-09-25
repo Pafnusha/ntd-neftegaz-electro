@@ -68,13 +68,16 @@ footer.foot{max-width:1560px;margin:0 auto;padding:8px 14px 40px;font-size:11px;
       <label>Kо одновременности <input id="ko" type="number" step="0.05" value="0.9" style="width:64px"></label>
       <label>cosφ цель <input id="costg" type="number" step="0.01" value="0.95" style="width:64px"></label>
       <label>Кр вручную <input id="krman" type="number" step="0.01" value="1" style="width:64px" disabled></label>
-      <label style="justify-content:flex-end"><input type="checkbox" id="krovr"> перекрыв</label>
+      <label style="justify-content:flex-end"><input type="checkbox" id="krovr"> перекрыв Кр</label>
+      <label>Число тр-ров <input id="ntr" type="number" min="1" value="1" style="width:56px"></label>
+      <label>Доп. загрузка тр. <input id="kload" type="number" step="0.05" min="0.3" max="1" value="0.8" style="width:64px"></label>
+      <label style="justify-content:flex-end"><input type="checkbox" id="engmode" checked> режим ИНЖЕНЕР</label>
     </div>
     <p class="note">Расчёт ведут два независимых потока (ТЗ 2.2): рабочие нагрузки — по РТМ 36.18.32.4-92 (n_э, Кр, 1,1·Σ при n_э≤10, Кс); резерв и ИБП — отдельным потоком, в ΣPр узлов не входят, но задают макс. ток для кабеля/автомата (ТЗ, п.4.1).</p>
   </section>
 
   <section class="card">
-    <h2>Ведомость нагрузок <span class="note" style="font-weight:400">— интерактивная таблица (ТЗ 2.1). <kbd>Enter</kbd> — ячейка правее/ниже, <kbd>Ctrl</kbd>+<kbd>Enter</kbd> — новая строка, <kbd>Alt</kbd>+<kbd>↑/↓</kbd> — переместить строку, мышью за ⠿ — drag&amp;drop</span></h2>
+    <h2>Ведомость нагрузок <span class="note" style="font-weight:400">— интерактивная таблица (ТЗ 2.1). <kbd>Enter</kbd> — ячейка правее/ниже, <kbd>Ctrl</kbd>+<kbd>Enter</kbd> — новая строка, <kbd>Alt</kbd>+<kbd>↑/↓</kbd> — переместить строку, мышью за ⣿ — drag&amp;drop</span></h2>
     <div class="toolbar">
       <button type="button" class="primary" id="b-add">+ Строка</button>
       <button type="button" id="b-dup">Дублировать последнюю</button>
@@ -96,9 +99,21 @@ footer.foot{max-width:1560px;margin:0 auto;padding:8px 14px 40px;font-size:11px;
 
   <section class="card">
     <h2>Итоги РТМ по секциям и узлу</h2>
+    <div class="totgrid" id="dash"></div>
     <div class="totgrid" id="tots"></div>
     <h3>Таблица расчёта нагрузок по РТМ 36.18.32.4-92</h3>
     <div class="scrollx" style="max-height:700px" id="rtmtable"></div>
+  </section>
+
+  <section class="card">
+    <h2>Нормативный аудит</h2>
+    <div id="audit" class="scrollx"></div>
+  </section>
+
+  <section class="card" id="engpanel">
+    <h2>Режим ИНЖЕНЕР — формулы и источники</h2>
+    <p class="note">Ни одна формула не введена без указания документа. Если методика упрощена — статус «ТРЕБУЕТ ПРОВЕРКИ НОРМАТИВНОЙ БАЗЫ».</p>
+    <div id="eng-body"></div>
   </section>
 
   <section class="card">
@@ -118,6 +133,6 @@ footer.foot{max-width:1560px;margin:0 auto;padding:8px 14px 40px;font-size:11px;
 </footer>
 <script src="loads-gost.js?v=4"></script>
 <script src="loads-ned.js?v=2"></script>
-<script src="nagruzki2.js?v=5"></script>
+<script src="nagruzki2.js?v=6"></script>
 </body>
 </html>
