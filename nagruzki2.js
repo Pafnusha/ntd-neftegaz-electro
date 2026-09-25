@@ -766,6 +766,56 @@ function exportDoc(svgPng) {
   download("nagruzki2-poyasnitelnica.doc", "application/msword", html);
 }
 
+/* Отдельный документ: Ведомость электрических нагрузок по РТМ (А3, альбомная) */
+function exportRtmDoc() {
+  if (!APP.res) recalc();
+  var conf = APP.conf, byId = {}; APP.res.rowsById.forEach(function (c) { byId[c.id] = c; });
+  var obj = ($("obj") || {}).value || "Объект", cust = ($("cust") || {}).value || "";
+  var css = "<style>@page{size:420mm 297mm;margin:8mm;} body{font:11pt 'Times New Roman',serif}"+
+    "h1{font-size:15pt;text-align:center;margin:2mm 0}h2{font-size:12.5pt;margin:4mm 0 2mm}"+
+    "table{border-collapse:collapse;width:100%;font-size:9.5pt}th,td{border:1px solid #333;padding:2.2px 4px;text-align:right;vertical-align:middle}"+
+    "td.l,th.l{text-align:left}.i{background:#dce9f7}.r{background:#fdeadd}.u{background:#f6dede}.g{background:#e9f5e9}"+
+    ".sign td{border:none;text-align:left;font-size:10pt;padding-top:6mm}</style>";
+  var num = 0;
+  var rows = "";
+  function tr(r, cls) {
+    var c = byId[r.id], tg = tgFromCos(r.cosPhi);
+    return "<tr class='" + cls + "'><td>" + (++num) + "</td><td class='l'>" + esc(r.name) + "</td><td>" + (r.kind === "work" ? "раб" : r.kind === "reserve" ? "рез" : "ИБП") + "</td><td>" + r.cat + "</td><td>" + (r.spz ? "да" : "") + "</td><td>" + (String(r.ph) === "1~220" ? "1~220 " + (APP.phaseAssign[r.id] || "") : "3~380") + "</td><td>" + r.n + "</td><td>" + f1(r.pnUnit) + "</td><td>" + f1(c.Pn) + "</td><td>" + f1(r.ki) + "</td><td>" + f1(r.cosPhi) + "</td><td>" + f1(tg) + "</td><td><b>" + f1(c.Pr) + "</b></td><td>" + f1(c.Qr) + "</td><td>" + f1(c.Sr = Math.sqrt(c.Pr * c.Pr + c.Qr * c.Qr)) + "</td><td>" + f0(c.Icalc) + "</td><td class='l'>" + c.s + " мм² · L" + r.L + "м</td><td>" + c.In + "</td></tr>";
+  }
+  SECS.forEach(function (sname) {
+    var sc = APP.secCalc[sname], g = sc.g, p = sc.p; if (!g || (!g.Pn && !sc.gRes.Pn && !sc.gUps.Pn)) return;
+    if (g.Pn) rows += "<tr class='i'><td colspan='18' class='l'><b>СЕКЦИЯ " + sname.slice(-1) + " — рабочий поток</b></td></tr>";
+    state.rows.filter(function (r) { return r.sec === sname && r.kind === "work"; }).forEach(function (r) { rows += tr(r, ""); });
+    if (p) rows += "<tr class='g'><td></td><td class='l' colspan='6'><b>Итого секция (РТМ): n_э=" + f1(g.ne) + " · Ki_ср=" + f1(g.kiAvg) + " · tgφ_ср=" + f1(g.tgAvg) + " · Кр=" + f1(p.kr) + ((g.ne > 0 && g.ne <= 10.01) ? " (Qр×1,1 при n_э≤10)" : "") + " · Kо=" + f1(conf.ko) + " · Q_КУ=" + f0(p.Qcu) + " квар</b></td><td>" + f1(g.Pn) + "</td><td></td><td></td><td></td><td><b>" + f1(p.Pp) + "</b></td><td><b>" + f1(p.Qp) + "</b></td><td><b>" + f1(p.Sp) + "</b></td><td><b>" + f0(p.Sp * 1000 / (1.732 * 400)) + "</b></td><td>—</td><td>—</td></tr>";
+    var gr = sc.gRes;
+    if (gr && gr.Pn) {
+      rows += "<tr class='r'><td colspan='18' class='l'><b>СЕКЦИЯ " + sname.slice(-1) + " — резервный поток (в ΣPр секции не входит, РТМ/ПУЭ 1.2.14)</b></td></tr>";
+      state.rows.filter(function (r) { return r.sec === sname && r.kind === "reserve"; }).forEach(function (r) { rows += tr(r, "r"); });
+      if (sc.pRes) rows += "<tr class='r'><td></td><td class='l' colspan='6'><b>Итого резерв секции: ΣPрез(Ki·Pн)=" + f1(gr.KiPn) + " кВт · Sрез=" + f1(sc.pRes.Sp) + " кВА · выбор сечений/автоматов по max(Iраб,Iрез)</b></td><td>" + f1(gr.Pn) + "</td><td></td><td></td><td></td><td>" + f1(sc.pRes.Pp) + "</td><td>" + f1(sc.pRes.Qp) + "</td><td>" + f1(sc.pRes.Sp) + "</td><td>" + f0(sc.pRes.Ir || sc.pRes.Sp * 1000 / (1.732 * 400)) + "</td><td>—</td><td>—</td></tr>";
+    }
+    var gu = sc.gUps;
+    if (gu && gu.Pn) {
+      rows += "<tr class='u'><td colspan='18' class='l'><b>СЕКЦИЯ " + sname.slice(-1) + " — поток ИБП (шина ИБП VFI, в ΣPр не входит)</b></td></tr>";
+      state.rows.filter(function (r) { return r.sec === sname && r.kind === "ups"; }).forEach(function (r) { rows += tr(r, "u"); });
+    }
+  });
+  (function () {
+    var wAll = rtmGroup(works()); var pAll = wAll.Pn ? rtmPower(wAll, conf) : null;
+    rows += "<tr class='g'><td></td><td class='l' colspan='7'><b>ИТОГО узел 0,4 кВ — рабочий поток (по всем секциям)</b></td><td>" + f1(wAll.Pn) + "</td><td></td><td></td><td></td><td><b>" + (pAll ? f1(pAll.Pp) : "—") + "</b></td><td><b>" + (pAll ? f1(pAll.Qp) : "—") + "</b></td><td><b>" + (pAll ? f1(pAll.Sp) : "—") + "</b></td><td><b>" + (pAll ? f0(pAll.Sp * 1000 / (1.732 * 400)) : "—") + "</b></td><td>—</td><td>—</td></tr>";
+  })();
+  var head = "«Ведомость электрических нагрузок» · Обозначение НТД-ЭЛ-ВН-«__» · Лист 1 — записка по РТМ 36.18.32.4-92 (форма А3)";
+  var html = "\ufeff<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Ведомость нагрузок РТМ</title>" + css + "</head><body><div class=Section1>" +
+    "<h1>ВЕДОМОСТЬ ЭЛЕКТРИЧЕСКИХ НАГРУЗОК 0,4 кВ<br><span style='font-size:12pt'>расчёт по РТМ 36.18.32.4-92</span></h1>" +
+    "<table><tr><td class='l'>Объект: <b>" + esc(obj) + "</b></td><td class='l'>Заказчик: " + esc(cust) + "</td><td class='l'>Дата: " + new Date().toLocaleDateString("ru-RU") + "</td><td class='l'>Режим: " + (conf.tpl === "A" ? "2 секции + АВР + ДЭС 0,4 кВ" : "3 секции + секционные + ДЭС 10 кВ") + "</td></tr>" +
+    "<tr><td class='l'>Трансформаторы: Т1=" + conf.tr + " кВА, Т2=" + conf.tr2 + " кВА, Ук=" + conf.uk + " %</td><td class='l'>ДЭС: " + conf.dg + " кВА · ИБП: " + conf.ups + " кВА</td><td class='l'>Sк.з. сети 10 кВ: " + conf.skz + " МВА</td><td class='l'>Кр по " + (conf.krt === "table1" ? "табл.1" : "табл.2") + " РТМ; cosφ цели " + conf.cosTarget + "; Kо=" + conf.ko + "</td></tr></table><br>" +
+    "<table><thead><tr><th>№</th><th class='l'>Наименование электроприёмника</th><th>Тип</th><th>Кат.</th><th>СПЗ</th><th>φ/U·фаза</th><th>к-во n</th><th>Pн ед., кВт</th><th>ΣPн, кВт</th><th>Ki</th><th>cosφ</th><th>tgφ</th><th>Pр=Кр·ΣKiPн, кВт</th><th>Qр, квар</th><th>Sр, кВА</th><th>Iр, А</th><th class='l'>Кабель (S·L)</th><th>QF, А</th></tr></thead><tbody>" + rows + "</tbody></table>" +
+    "<p style='font-size:9pt'>Примечания: 1) Резервные нагрузки и нагрузки ИБП в расчётные ΣPр секций не включаются (РТМ 36.18.32.4-92); питание электроприёмников кат. I — от двух независимых вводов с АВР (ПУЭ п.1.2.14). 2) При n_э≤10 Qр принимается с коэффициентом 1,1. 3) 1-фазные приёмники распределены по фазам L1/L2/L3 автобалансировкой из условия перекоса ≤30 % (ГОСТ 32144-2013). 4) Сечения кабелей и номиналы автоматов выбраны по max(Iр раб, Iр рез) с проверкой ΔU≤5 % (3 % — освещение) и чувствительности Iкз.одн≥1,25·I отсечки; трассы СПЗ — каб. ВВГнг(А)-FRLS в огнестойких лотках (разъяснения ВНИИПО). 5) Токи КЗ — упрощённый расчёт, уточнить расчётом РЗ.</p>" +
+    "<table class='sign'><tr><td>Разработал (гл. специалист по электроснабжению)</td><td>______________________ / ______________________ /</td><td>«___» ____________ 20___ г.</td></tr>" +
+    "<tr><td>Проверил</td><td>______________________ / ______________________ /</td><td>«___» ____________ 20___ г.</td></tr>" +
+    "<tr><td>Утвердил</td><td>______________________ / ______________________ /</td><td>«___» ____________ 20___ г.</td></tr></table>" +
+    "</div></body></html>";
+  download("vedomost-nagruzok-RTM-A3.doc", "application/msword", new Blob([html], { type: "application/msword" }));
+}
 /* ===== SECTION:boot ===== */
 function wire() {
   var tbody = $("grid").querySelector("tbody");
@@ -836,6 +886,7 @@ function wire() {
     __downloadPdfSheet(APP.P, "nagruzki2-ols-" + APP.conf.tpl, "Нагрузки 2.0 — ОЛС (лист А1)");
   };
   $("b-xls").onclick = exportXls;
+  $("b-rtmdoc").onclick = exportRtmDoc;
   $("b-doc").onclick = function () {
     if (!APP.sheetBuilt) renderOls();
     if (window.svgSheetToJpeg) {

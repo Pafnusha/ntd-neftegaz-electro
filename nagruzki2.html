@@ -53,6 +53,8 @@ footer.foot{max-width:1560px;margin:0 auto;padding:8px 14px 40px;font-size:11px;
           <option value="B">Вариант Б — 3 секции + секционные + ДЭС 10 кВ на СЕКЦИИ 3</option>
         </select>
       </label>
+      <label>Объект<br><input id="obj" style="width:260px" value="Кустовая насосная станция · НКУ 0,4 кВ"></label>
+      <label>Заказчик<br><input id="cust" style="width:180px" value="АО «НТД» · промысел»"></label>
       <label>Uном сети, кВ <select id="un"><option>0.4</option><option>10</option></select></label>
       <label>Sкз сети 10 кВ, МВА <input id="skz" type="number" step="5" value="250" style="width:80px"></label>
       <label>T раб. Sn, кВА <input id="tr1" type="number" value="1000" style="width:80px"></label>
@@ -86,6 +88,7 @@ footer.foot{max-width:1560px;margin:0 auto;padding:8px 14px 40px;font-size:11px;
       <button type="button" id="b-pdf">Лист ОЛС — PDF (А1)</button>
       <button type="button" id="b-xls">Экспорт Excel (.xls)</button>
       <button type="button" id="b-doc">Экспорт Word (пояснительная записка)</button>
+      <button type="button" class="primary" id="b-rtmdoc">Word — Ведомость нагрузок РТМ (А3)</button>
     </div>
     <div class="scrollx"><table class="grid" id="grid"><thead></thead><tbody></tbody></table></div>
     <p class="note" id="grid-foot"></p>
@@ -114,6 +117,6 @@ footer.foot{max-width:1560px;margin:0 auto;padding:8px 14px 40px;font-size:11px;
 </footer>
 <script src="loads-gost.js?v=4"></script>
 <script src="loads-ned.js?v=2"></script>
-<script src="nagruzki2.js?v=4"></script>
+<script src="nagruzki2.js?v=5"></script>
 </body>
 </html>
