@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Расчёт пожарных рисков — ПС 35/10, КТП 10(6)/0,4, электроустановки · СП 486.13130.2009 / приказ МЧС № 533</title>
+<style>
+:root{--ink:#1c2733;--mut:#5a6a7e;--line:#d7dfe8;--acc:#1b6ef3;--bad:#c62828;--warn:#b26a00;--ok:#1b8a3f}
+*{box-sizing:border-box}body{margin:0;font:14px/1.5 "Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:#f2f5f9}
+header.top{background:#3b1220;color:#fff;display:flex;gap:16px;align-items:center;padding:10px 18px;flex-wrap:wrap}
+header.top .brand{font-weight:700}header.top a{color:#f3c7d2;text-decoration:none;font-size:13px}header.top a.cur{color:#fff;font-weight:600}
+main{max-width:1500px;margin:14px auto 60px;padding:0 12px}
+section.card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:14px}
+h2{font-size:16px;margin:0 0 8px}h3{font-size:13.5px;margin:10px 0 6px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:8px}
+.toolbar label{display:flex;flex-direction:column;font-size:11px;color:var(--mut);gap:2px}
+input,select{font:13px inherit;padding:3px 6px;border:1px solid var(--line);border-radius:5px;background:#fff;color:var(--ink)}
+input[type=number]{width:88px}
+button{font:13px inherit;padding:6px 12px;border:1px solid var(--acc);background:#fff;color:var(--acc);border-radius:6px;cursor:pointer}
+button.primary{background:var(--acc);color:#fff}
+table.grid{border-collapse:collapse;width:100%;font-size:12px}
+table.grid th{background:#3b1220;color:#fff;border:1px solid #5f3345;padding:4px 6px;font-weight:600;white-space:nowrap}
+table.grid td{border:1px solid var(--line);padding:2px 5px;background:#fff}
+table.grid td.num{background:#eef3fa;text-align:right;font-variant-numeric:tabular-nums}
+table.grid td.bad{background:#fdecec;color:var(--bad);font-weight:600}table.grid td.ok{background:#eaf6ec;color:var(--ok)}
+.scrollx{overflow:auto}
+.verdict{border-radius:8px;padding:10px 14px;font-size:14px;margin:8px 0}
+.verdict.ok{background:#eaf6ec;border:1px solid #bcd9bc}.verdict.bad{background:#fdecec;border:1px solid #e7b9b9}.verdict.mid{background:#fff6e5;border:1px solid #e8cf9a}
+.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:#fafcff;font-size:12.5px}
+.chip b{display:block;font-size:13px}
+ul.notes{font-size:12.5px;color:#33465e;margin:6px 0;padding-left:20px}
+.note{font-size:12px;color:var(--mut)}
+footer.foot{max-width:1500px;margin:0 auto;padding:8px 14px 40px;font-size:11px;color:var(--mut)}
+</style>
+</head>
+<body>
+<header class="top">
+  <span class="brand">НТД · Нефтегаз Электрика — Пожарные риски</span>
+  <a href="index.html">Главная</a>
+  <a href="loads.html">Нагрузки</a>
+  <a href="nagruzki2.html">Нагрузки 2.0</a>
+  <a href="ibp.html">ИБП</a>
+  <a class="cur" href="pozh-risk.html">Расчёт пожарных рисков</a>
+</header>
+<main>
+  <section class="card">
+    <h2>Объект и исходные данные</h2>
+    <div class="toolbar">
+      <label>Шаблон объекта<br>
+        <select id="tpl">
+          <option value="ps3510">ПС 35/10 кВ (маслонаполненная)</option>
+          <option value="ktp-oil">КТП 10(6)/0,4 кВ с масляным Т</option>
+          <option value="ktp-dry">КТП/ЩРН 10(6)/0,4 кВ, сухие Т</option>
+          <option value="ru">РУ / электромашинное помещение 0,4–10 кВ</option>
+          <option value="akkb">Аккумуляторная (зарядная станция)</option>
+          <option value="empty">Пустой (задать вручную)</option>
+        </select>
+      </label>
+      <label>Обозначение объекта <input id="objname" style="width:230px" value="ПС 35/10 кВ · комплект №1"></label>
+      <label>Человек в наиболее населённой зоне, N <input id="npeople" type="number" value="2" min="0" step="1" style="width:60px"></label>
+      <label>Критерий приемлемый R<sub>доп</sub>, 1/год <input id="rcrit" type="number" step="0.00005" value="0.0001" style="width:90px"></label>
+      <label>Критерий индивидуального риска q<sub>доп</sub> <input id="qcrit" type="number" step="0.0000001" value="0.000001" style="width:100px"></label>
+      <button type="button" class="primary" id="b-calc">Рассчитать риск</button>
+      <button type="button" id="b-report">Отчёт / печать (А4)</button>
+      <button type="button" id="b-doc">Word — пояснения к расчёту</button>
+      <button type="button" id="b-save">Сохранить JSON</button>
+      <button type="button" id="b-load">Загрузить JSON</button><input type="file" id="f-json" accept=".json" hidden>
+    </div>
+    <p class="note">Методика: СП 486.13130.2009 (действующая редакция) и приказы МЧС России № 404 (до 2024) / № 533 (с 01.01.2025): — количественный пожарный риск R = Σ (частота источника q × вероятность воспламенения P<sub>воспл</sub> × (1−эффективность АУПТ β) × вероятность невозможности самостоятельного выхода P<sub>нев</sub>); индивидуальный риск — с учётом времени пребывания человека. Категории помещений — приложения № 2 и № 3 к ФЗ-123 (порядок — СП 12.13130.2009): в калькуляторе — справочная классификация; перечень обязательного АУП — СП 486.1311500.2020 (табл. 1–4); первичные средства — ППР РФ № 1479, ГОСТ Р 51057 (СП 9.13130.2009 с 01.03.2025 справочно). Частоты отказов редактируемы: приняты по обобщённой статистике — для проектных расчётов уточнять по фактическим данным эксплуатации объекта.</p>
+  </section>
+
+  <section class="card">
+    <h2>Зоны объекта (помещения / открытые установки)</h2>
+    <div class="scrollx"><table class="grid" id="zones-table"></table></div>
+    <div class="toolbar" style="margin-top:6px"><button type="button" id="b-zadd">+ зона</button><button type="button" id="b-zdel">– последнюю зону</button></div>
+    <h3>Справочные категории (прил. № 2/№ 3 к ФЗ-123) и класс пожарной опасности здания (табл. 21)</h3>
+    <div class="chips" id="cat-out"></div>
+  </section>
+
+  <section class="card">
+    <h2>Источники воздействия (аварийные режимы электрооборудования)</h2>
+    <div class="note">q — типовая частота отказа источника с пожароопасностью, 1/(год·единицу); Кол-во — число единиц в зоне.</div>
+    <div class="scrollx" style="margin-top:6px"><table class="grid" id="src-table"></table></div>
+    <div class="toolbar" style="margin-top:6px">
+      <button type="button" id="b-sadd">+ источник</button><button type="button" id="b-sdel" hidden>–</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Результат: количественный и индивидуальный пожарный риск</h2>
+    <div id="risk-out"></div>
+    <div class="scrollx" style="margin-top:8px"><table class="grid" id="risk-table"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Составляющие риска (прозрачность расчёта)</h2>
+    <div class="scrollx"><table class="grid" id="zone-risk-table"></table></div>
+    <h3>Мероприятия, влияющие на расчёт (включите — пересчитайте)</h3>
+    <div class="chips" id="measures"></div>
+    <ul class="notes" id="ntd-list"></ul>
+  </section>
+</main>
+<footer class="foot">Инженерный калькулятор предварительной оценки. Для деклараций пожарного риска (ст. 90–92 ФЗ-123) и разделов проектной документации применять полную методику СП 486.13130.2009 / приказ МЧС России № 533 с верификацией расчёта. НТД: ФЗ-123; СП 486.13130.2009 (расчёт рисков); приказы МЧС России № 404 (10.07.2009) и № 533 (26.06.2024, с 01.01.2025); СП 486.1311500.2020 (перечни АУП, табл. 1–4); ПУЭ 7 (гл. 4.4; п. 4.2.116–4.2.119, 4.2.220); СП 12.13130.2009; СП 2.13130.2020; СП 484/485.13130.2020; ППР РФ № 1479; ПТЭЭП (приказ Минэнерго № 811); ГОСТ Р 51057; СП 76.13130.2016.</footer>
+<script src="pozh-risk.js?v=2"></script>
+</body>
+</html>
