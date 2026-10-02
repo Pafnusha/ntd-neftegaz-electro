@@ -49,6 +49,7 @@ footer.foot{max-width:1500px;margin:0 auto;padding:8px 14px 40px;font-size:11px;
       <label>Шаблон объекта<br>
         <select id="tpl">
           <option value="ps3510">ПС 35/10 кВ (маслонаполненная)</option>
+          <option value="ess530">ПС 35/10 ESS-530 — пример адаптации по ИТТ 25.011.1-ЭС1-ИТТ3 (сухие ТСГЛ)</option>
           <option value="ktp-oil">КТП 10(6)/0,4 кВ с масляным Т</option>
           <option value="ktp-dry">КТП/ЩРН 10(6)/0,4 кВ, сухие Т</option>
           <option value="ru">РУ / электромашинное помещение 0,4–10 кВ</option>
@@ -86,7 +87,30 @@ footer.foot{max-width:1500px;margin:0 auto;padding:8px 14px 40px;font-size:11px;
     </div>
   </section>
 
+    <section class="card">
+    <h2>Конструктор: расчёт под любую ПС / КТП по вашим параметрам</h2>
+    <div class="toolbar">
+      <label>Силовые тр-ры<br><select id="g_type"><option value="tm">ТМ(Ф) масляные 10/0,4</option><option value="tdn">ТДН масляные 35/10</option><option value="tsz">ТСЗ/ТСГЛ сухие (по ИТТ)</option></select></label>
+      <label>Кол-во, шт <input id="g_n" type="number" value="2" min="1" max="8" style="width:56px"></label>
+      <label>S ном, кВА <input id="g_kva" type="number" value="1000" step="100" style="width:80px"></label>
+      <label>Ячейки 6–35 кВ<br><select id="g_krut"><option value="cb_oil">маслонаполненные</option><option value="cb_sf6" selected>вакуумные/элегазовые</option></select></label>
+      <label>Кол-во ячеек <input id="g_krun" type="number" value="8" min="0" max="30" style="width:56px"></label>
+      <label>Каб. пучки, км <input id="g_cab" type="number" value="0.5" step="0.1" min="0" style="width:60px"></label>
+      <label>АКБ (шт блоков) <input id="g_batt" type="number" value="0" min="0" style="width:56px"></label>
+      <label>Люди: присутствие (доля года) <input id="g_pres" type="number" value="0.15" step="0.05" min="0" max="1" style="width:66px"></label>
+      <button type="button" class="primary" id="b-build">Собрать ПС и рассчитать</button>
+    </div>
+    <p class="note">Объём масла берётся из типовой таблицы (для ТМ: по мощности; для ТДН 35 кВ — ориентировочно 0,9–1,15 м³ на 1 МВА); фактический — по паспорту/щиту трансформатора; редактируется в таблице зон.</p>
+    <div id="build-out" class="note"></div>
+  </section>
+
   <section class="card">
+    <h2>Как пройти экспертизу без автоматического пожаротушения — подсказки (НТД РФ)</h2>
+    <div class="chips" id="adv-box"></div>
+    <div id="adv-out"></div>
+    <p class="note">Отключение АУПТ «в одну кнопку» без замены технологии — невозможно, если объект подпадает в перечень СП 486.1311500.2020. Эксперта удовлетворяет обоснование: позиция перечня к объекту не относится (обоснованно) + расчётный риск в критериях. Ниже — легальные рычаги; включайте — расчёт пересчитается, итог попадёт в отчёт.</p>
+  </section>
+<section class="card">
     <h2>Результат: количественный и индивидуальный пожарный риск</h2>
     <div id="risk-out"></div>
     <div class="scrollx" style="margin-top:8px"><table class="grid" id="risk-table"></table></div>
@@ -101,6 +125,6 @@ footer.foot{max-width:1500px;margin:0 auto;padding:8px 14px 40px;font-size:11px;
   </section>
 </main>
 <footer class="foot">Инженерный калькулятор предварительной оценки. Для деклараций пожарного риска (ст. 90–92 ФЗ-123) и разделов проектной документации применять полную методику СП 486.13130.2009 / приказ МЧС России № 533 с верификацией расчёта. НТД: ФЗ-123; СП 486.13130.2009 (расчёт рисков); приказы МЧС России № 404 (10.07.2009) и № 533 (26.06.2024, с 01.01.2025); СП 486.1311500.2020 (перечни АУП, табл. 1–4); ПУЭ 7 (гл. 4.4; п. 4.2.116–4.2.119, 4.2.220); СП 12.13130.2009; СП 2.13130.2020; СП 484/485.13130.2020; ППР РФ № 1479; ПТЭЭП (приказ Минэнерго № 811); ГОСТ Р 51057; СП 76.13130.2016.</footer>
-<script src="pozh-risk.js?v=2"></script>
+<script src="pozh-risk.js?v=6"></script>
 </body>
 </html>
