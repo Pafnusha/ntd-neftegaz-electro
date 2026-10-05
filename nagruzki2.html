@@ -59,7 +59,7 @@ table.grid tr.rowups td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
 <button class="primary" id="b-add">+</button><button id="b-dup">Дубль</button><button id="b-del">Удал.</button>
 <button id="b-sortname">А-Я</button><button id="b-demo">Демо</button>
 <button id="b-save">JSON</button><button id="b-load">Load</button><input type="file" id="f-json" accept=".json" hidden>
-<button class="primary" id="b-ols">ОЛС</button><button id="b-pdf">PDF</button>
+<button class="primary" id="b-ols">ОЛС</button><button id="b-pdf">PDF</button><button id="b-net">Схема X6</button>
 <button id="b-xls">Excel</button><button id="b-doc">Word</button><button class="primary" id="b-rtmdoc">Word А3</button>
 </div>
 <div class="scrollx"><table class="grid" id="grid"><thead></thead><tbody></tbody></table></div>
@@ -69,10 +69,16 @@ table.grid tr.rowups td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
 <section class="card"><h2>Нормативный аудит</h2><div id="audit"></div></section>
 <section class="card" id="engpanel"><h2>ИНЖЕНЕР</h2><div id="eng-body"></div></section>
 <section class="card"><h2>Предупреждения</h2><ul id="warnlist" class="note"></ul></section>
+  <section class="card" id="netcard" hidden>
+    <h2>Интерактивная однолинейная схема — движок AntV X6 (MIT) <span class="note" style="font-weight:400">— перетаскивайте узлы, связи проходят ортогонально; колесо мыши — масштаб</span></h2>
+    <div class="toolbar"><button type="button" id="b-netsize">Вписать в окно</button><button type="button" id="b-netreset">Компоновка заново</button><span class="note" id="net-note"></span></div>
+    <div id="netbox" style="height:660px;border:1px solid var(--line);border-radius:8px;background:#fff;position:relative"></div>
+  </section>
 <section class="card" id="sheetcard" hidden><h2>ОЛС</h2><div id="sheetbox"></div></section>
 </main>
 <footer class="foot note">РТМ 36.18.32.4-92. КЗ — упрощённый расчёт.</footer>
 <script src="loads-gost.js?v=4"></script>
 <script src="loads-ned.js?v=2"></script>
-<script src="nagruzki2.js?v=5"></script>
+<script src="vendor-x6.min.js"></script>
+<script src="nagruzki2.js?v=6"></script>
 </body></html>
