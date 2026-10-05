@@ -870,7 +870,7 @@ function wire() {
   $("b-del").onclick = function () { if (state.rows.length > 1) { state.rows.pop(); renderGrid(); } };
   $("b-sortname").onclick = function () { state.rows.sort(function (a, b) { return String(a.name).localeCompare(String(b.name), "ru"); }); renderGrid(); };
   $("b-demo").onclick = function () { state.rows = demoRows().map(function (r) { r.id = uid(); return r; }); renderGrid(); };
-  $("b-save").onclick = function () { download("nagruzki2-state.json", "application/json", JSON.stringify({ conf: readConf(), rows: state.rows }, null, 1)); };
+  $("b-save").onclick = function () { download("nagruzki2-state.json", "application/json", JSON.stringify({ conf: readConf(), rows: state.rows, netPos: APP.netPos || {} }, null, 1)); };
   $("b-load").onclick = function () { $("f-json").click(); };
   $("f-json").onchange = function () {
     var f = this.files && this.files[0]; this.value = ""; if (!f) return;
@@ -910,58 +910,118 @@ function wire() {
 }
 boot();
 var netGraph = null;
+if (!window.__x6css) { window.__x6css = 1; var st = document.createElement("style");
+  st.textContent = "#netbox{position:relative;overflow:hidden}#netbox>.x6-graph,#netbox .x6-graph{position:absolute;left:0;top:0;right:0;bottom:0;width:100%;height:100%;overflow:hidden}#netbox svg{position:absolute;left:0;top:0;width:100%!important;height:100%!important}";
+  document.head.appendChild(st); }
+var BLK_DEFS = {
+  src:  { w: 190, h: 30, fill: "#eef4ff", stroke: "#33465e", label: "Источник: Сеть 10(6) кВ · Т" },
+  bus:  { w: 340, h: 22, fill: "#0b3d69", stroke: "#0b3d69", label: "СЕКЦИЯ · 0,4 кВ", textFill: "#fff", textBold: true },
+  qf:   { w: 74, h: 40, fill: "#ffffff", stroke: "#223344", label: "QF2xx · In·C" },
+  km:   { w: 60, h: 24, fill: "#e8f0ff", stroke: "#1b6ef3", label: "KM (Э)/(М)" },
+  load: { w: 96, h: 40, fill: "#ffffff", stroke: "#223344", label: "Потребитель" },
+  mtr:  { w: 80, h: 40, fill: "#fff", stroke: "#223344", label: "М · двигатель" },
+  ups:  { w: 96, h: 34, fill: "#fdf1f1", stroke: "#c62828", label: "шина/нагрузка ИБП" },
+  xt:   { w: 60, h: 18, fill: "#fff", stroke: "#33465e", label: "XT" },
+  ibp:  { w: 150, h: 34, fill: "#fdf1f1", stroke: "#c62828", label: "ИБП VFI · S, кВА" },
+  gen:  { w: 150, h: 34, fill: "#fdeadd", stroke: "#b26a00", label: "ДЭС · S, кВА" }
+};
+function blkPorts(g) {
+  return { groups:{
+      top:{ position:"top", attrs:{ circle:{ r:3, magnet:true, stroke:"#0b3d69", fill:"#fff" } } },
+      bottom:{ position:"bottom", attrs:{ circle:{ r:3, magnet:true, stroke:"#0b3d69", fill:"#fff" } } },
+      left:{ position:"left", attrs:{ circle:{ r:3, magnet:true, stroke:"#0b3d69", fill:"#fff" } } },
+      right:{ position:"right", attrs:{ circle:{ r:3, magnet:true, stroke:"#0b3d69", fill:"#fff" } } }
+    }, items:[{id:"i_top",group:"top"},{id:"o_bot",group:"bottom"},{id:"i_left",group:"left"},{id:"o_right",group:"right"}] };
+}
 function renderNet(reset) {
   if (!window.X6 || !X6.Graph) { alert("Движок X6 не загружен (vendor-x6.min.js)"); return; }
   if (!APP.res) recalc();
   $("netcard").hidden = false;
+  ensurePalette();
   var conf = readConf();
   var rows = state.rows, byId = {};
   APP.res.rowsById.forEach(function (c) { byId[c.id] = c; });
+  APP.netPos = APP.netPos || {};
   var box = $("netbox");
-  if (!netGraph || reset) { box.innerHTML = ""; netGraph = new X6.Graph({ container: box, autoResize: true, background: { color: "#ffffff" }, grid: { visible: true, type: "mesh", size: 12, args: { color: "#e6edf6", thickness: 1 }, drawable: true }, panning: { enabled: true }, mousewheel: { enabled: true, minScale: 0.35, maxScale: 2.2 }, connecting: { router: { name: "manhattan", args: { padding: 14 } }, connector: { name: "rounded", args: { radius: 6 } }, connectionPoint: "anchor", allowBlank: false } }); }
+  if (!netGraph || reset) {
+    box.innerHTML = "";
+    netGraph = new X6.Graph({ container: box, autoResize: false, background: { color: "#ffffff" },
+      grid: { visible: true, type: "mesh", size: 12, args: { color: "#e6edf6", thickness: 1 }, drawable: true },
+      panning: { enabled: true }, mousewheel: { enabled: true, minScale: 0.35, maxScale: 2.2 },
+      connecting: { router: { name: "manhattan", args: { padding: 14 } }, connector: { name: "rounded", args: { radius: 6 } }, connectionPoint: "anchor", allowBlank: false, allowLoop: false },
+      interacting: { edgeLabelMovable: true, vertexMovable: true, vertexAddable: true, vertexDeletable: true, arrowheadMovable: true } });
+    if (!window.__edArmedClick) { window.__edArmedClick = 1;
+      document.addEventListener("click", function (e) {
+        if (!netGraph || !netGraph._armed) return;
+        var box0 = document.getElementById("netbox"); if (!box0 || !box0.contains(e.target)) return;
+        var t = e.target;
+        if (t.closest && (t.closest(".x6-node") || t.closest(".x6-edge") || t.closest("[magnet]") || t.closest("#n2-palette"))) return;
+        addBlock(netGraph._armed, netGraph.clientToLocal(e.clientX, e.clientY));
+      }, true);
+    }
+    netGraph.on("edge:mouseenter", function (a) { if (a.edge) a.edge.addTools([{ name: "vertices" }, { name: "segments", args: { keepAspectRatio: true } }, { name: "button-remove", args: { distance: 24 } }]); });
+    netGraph.on("edge:mouseleave", function (a) { if (a.edge) a.edge.removeTools(); });
+    netGraph.on("node:moved", function (a) { var n = a.node || (a.cell && a.cell); if (n && n.id) APP.netPos[n.id] = n.getPosition(); });
+    netGraph.on("cell:mouseenter", function (a) {
+      var cell = a.cell || (a.node) || (a.edge); if (!cell) return;
+      if (cell.isEdge()) { cell.addTools([{name:"vertices"},{name:"segments"},{name:"button-remove",args:{distance:20}}]); }
+      else cell.addTools([{name:"button-remove",args:{distance:-14, onClick: function (o) { o.cell.remove(); }}}]);
+    });
+    netGraph.on("cell:mouseleave", function (a) { var cell = a.cell || a.node || a.edge; if (cell && cell.removeTools) cell.removeTools(); });
+    netGraph.on("node:dblclick", function (a) {
+      var n = a.node; var cur = n.attr("label/text") || "";
+      var t = prompt("Подпись узла (первая строка — имя):", cur.replace(/\n/g, " / "));
+      if (t != null) n.attr("label/text", t.replace(/ \/ /g, "\n"));
+    });
+  }
   netGraph.clearCells();
   var secN = conf.tpl === "B" ? 3 : 2;
   var upsRows = rows.filter(function (r) { return r.kind === "ups"; });
   var zoneW = 470, x0 = 32, busY = 128, srcY = 34, conY = 250;
-  var busIds = [];
+  var busIds = [], busGeo = [];
   function secRows(i) { return rows.filter(function (r) { return r.sec === "Секция " + i && r.kind !== "ups"; }); }
   for (var i = 1; i <= secN; i++) {
     var rx0 = x0 + (i - 1) * zoneW;
-    busIds[i] = "BUS" + i;
     var sr = secRows(i);
-    var bp = [];
-    for (var k2 = 0; k2 < sr.length; k2++) bp.push({ id: "p" + i + "_" + k2, group: "out" });
+    busIds[i] = "BUS" + i;
     netGraph.addNode({ id: busIds[i], x: rx0, y: busY, width: zoneW - 60, height: 24, shape: "rect", zIndex: 5,
       attrs: { body: { fill: "#0b3d69", stroke: "#0b3d69", rx: 3 }, label: { text: "СЕКЦИЯ " + i + "  ·  0,4 кВ", fill: "#fff", fontSize: 11, fontWeight: 700 } },
-      ports: { groups: { out: { position: { name: "line", args: { start: [16, 24], end: ["97%", 24] } }, attrs: { circle: { r: 2.5, magnet: true, stroke: "#0b3d69", fill: "#fff" } } }, items: bp } } });
+      ports: { groups: { out: { position: { name: "line", args: { start: [16, 24], end: ["97%", 24] } }, attrs: { circle: { r: 2.5, magnet: true, stroke: "#0b3d69", fill: "#fff" } } }, items: sr.map(function (r2, k) { return { id: "p" + i + "_" + k, group: "out" }; }) } } });
+    busGeo[i] = { left: rx0, right: rx0 + zoneW - 60 };
     var srcLabel = i === 1 ? "Сеть 10(6) кВ · Т1 (" + conf.tr + " кВА)" : (conf.tpl === "A" ? "ДЭС 0,4 кВ · " + conf.dg + " кВА" : (i === 2 ? "Сеть 10(6) кВ (рез.) · Т2 (" + conf.tr2 + " кВА)" : "ДЭС 10 кВ · ТЗ (" + conf.dg + " кВА)"));
     var isResSrc = (i === 2 && conf.tpl === "A") || i === 3;
     netGraph.addNode({ id: "SRC" + i, x: rx0 + 90, y: srcY, width: 220, height: 30, shape: "rect",
       attrs: { body: { fill: isResSrc ? "#fdeadd" : "#eef4ff", stroke: isResSrc ? "#b26a00" : "#33465e" }, label: { text: srcLabel, fontSize: 10 } },
       ports: { groups: { out: { position: "bottom" } }, items: [{ id: "s", group: "out" }] } });
-    netGraph.addEdge({ source: { cell: "SRC" + i, port: "s" }, target: { cell: busIds[i], port: bp.length ? "p" + i + "_0" : undefined }, zIndex: 4,
+    netGraph.addEdge({ source: { cell: "SRC" + i, port: "s" }, target: { cell: busIds[i], port: sr.length ? "p" + i + "_0" : undefined, anchor: { name: "center" } }, zIndex: 4,
       attrs: { line: { stroke: isResSrc ? "#e67e22" : "#33465e", strokeWidth: 1.6, targetMarker: null } } });
-    (function (ii) {
-      sr.forEach(function (r, idx) {
-        var c = byId[r.id] || {};
-        var isRes = r.kind === "reserve";
-        var col = isRes ? "#e67e22" : "#223344";
-        var label = "W" + (201 + rows.indexOf(r)) + " · " + (r.name || "").slice(0, 22);
-        netGraph.addNode({ id: r.id, x: rx0 + idx * ((zoneW - 70) / Math.max(1, sr.length)) + 6, y: conY + (isRes ? 120 : 0),
-          width: Math.max(96, (zoneW - 80) / Math.max(1, sr.length) - 8), height: 54, shape: "rect",
-          attrs: { body: { fill: isRes ? "#fff7ef" : "#fff", stroke: col, strokeWidth: isRes ? 1.6 : 1.2, strokeDasharray: isRes ? "5 3" : null, rx: 4 },
-            label: { text: label + "\n" + f1(c.Pr || 0) + " кВт · " + f0(c.Icalc || 0) + " А · QF " + (c.In || "") + " А", fontSize: 8.5, textWrap: { width: -8, height: -8, ellipsis: true } } },
-          ports: { groups: { up: { position: "top", attrs: { circle: { r: 2.5, magnet: true, stroke: col, fill: "#fff" } } } }, items: [{ id: "in", group: "up" }] } });
-        netGraph.addEdge({ source: { cell: busIds[ii], port: "p" + ii + "_" + idx }, target: { cell: r.id, port: "in" }, zIndex: 3,
-          attrs: { line: { stroke: col, strokeWidth: 1.4, strokeDasharray: isRes ? "5 3" : null, targetMarker: { name: "block", width: 7, height: 5 } } } });
-      });
-    })(i);
+    sr.forEach(function (r, idx) {
+      var c = byId[r.id] || {};
+      var isRes = r.kind === "reserve";
+      var col = isRes ? "#e67e22" : "#223344";
+      var label = "W" + (201 + rows.indexOf(r)) + " · " + (r.name || "").slice(0, 22);
+      var nid = r.id; var nx = rx0 + idx * ((zoneW - 70) / Math.max(1, sr.length)) + 6; var ny = conY + (isRes ? 120 : 0);
+      netGraph.addNode({ id: nid, x: nx, y: ny, width: Math.max(96, (zoneW - 80) / Math.max(1, sr.length) - 8), height: 54, shape: "rect",
+        attrs: { body: { fill: isRes ? "#fff7ef" : "#fff", stroke: col, strokeWidth: isRes ? 1.6 : 1.2, strokeDasharray: isRes ? "5 3" : null, rx: 4 },
+          label: { text: label + "\n" + f1(c.Pr || 0) + " кВт · " + f0(c.Icalc || 0) + " А · QF " + (c.In || "") + " А", fontSize: 8.5, textWrap: { width: -8, height: -8, ellipsis: true } } },
+        ports: { groups: { up: { position: "top", attrs: { circle: { r: 2.5, magnet: true, stroke: col, fill: "#fff" } } } }, items: [{ id: "in", group: "up" }] } });
+      netGraph.addEdge({ source: { cell: busIds[i], port: "p" + i + "_" + idx }, target: { cell: nid, port: "in" }, zIndex: 3,
+        attrs: { line: { stroke: col, strokeWidth: 1.4, strokeDasharray: isRes ? "5 3" : null, targetMarker: { name: "block", width: 7, height: 5 } } } });
+    });
+  }
+  for (var ai = 1; ai < secN; ai++) {
+    var xmid = (busGeo[ai].right + busGeo[ai + 1].left) / 2 - 30;
+    netGraph.addNode({ id: "ATS" + ai, x: xmid, y: busY - 9, width: 66, height: 22, shape: "rect",
+      attrs: { body: { fill: "#e8f0ff", stroke: "#1b6ef3", rx: 3 }, label: { text: "QF11·KM%d (Э)/(М)".replace("%d", ai), fontSize: 7.5, fill: "#1b6ef3" } },
+      ports: { groups: { in: { position: "left", attrs: { circle: { r: 3, magnet: true, stroke: "#1b6ef3", fill: "#fff" } } }, out: { position: "right", attrs: { circle: { r: 3, magnet: true, stroke: "#1b6ef3", fill: "#fff" } } } }, items: [{ id: "in", group: "in" }, { id: "out", group: "out" }] } });
+    netGraph.addEdge({ source: { cell: busIds[ai], port: { anchor: { name: "right" } } }, target: { cell: "ATS" + ai, port: "in" }, router: "normal", zIndex: 5, attrs: { line: { stroke: "#1b6ef3", strokeWidth: 1.4 } } });
+    netGraph.addEdge({ source: { cell: "ATS" + ai, port: "out" }, target: { cell: busIds[ai + 1], port: { anchor: { name: "left" } } }, router: "normal", zIndex: 5, attrs: { line: { stroke: "#1b6ef3", strokeWidth: 1.4 } } });
   }
   rows.filter(function (r) { return r.kind === "reserve"; }).forEach(function (rr) {
-    var w = rows.filter(function (r) { return r.kind === "work" && r.name === rr.name; })[0];
-    if (w && netGraph.getCellById(w.id)) netGraph.addEdge({ source: { cell: rr.id }, target: { cell: w.id }, zIndex: 2,
+    var w = rows.filter(function (r2) { return r2.kind === "work" && r2.name === rr.name; })[0];
+    if (w && netGraph.getCellById(w.id) && netGraph.getCellById(rr.id)) netGraph.addEdge({ source: { cell: rr.id }, target: { cell: w.id }, zIndex: 2,
       attrs: { line: { stroke: "#e67e22", strokeWidth: 1, strokeDasharray: "2 3", targetMarker: { name: "circle", r: 2.5 } } },
-      labels: [{ attrs: { text: { text: "резерв (КМ/АВР)", fontSize: 7.5, fill: "#b26a00" }, rect: { fill: "#fff", opacity: 0.85 } }, position: 0.5 }],
+      labels: [{ attrs: { text: { text: "резерв к нагрузке", fontSize: 7, fill: "#b26a00" }, rect: { fill: "#fff", opacity: 0.85 } }, position: 0.5 }],
       router: "normal", connector: "rounded" });
   });
   if (upsRows.length) {
@@ -971,7 +1031,7 @@ function renderNet(reset) {
       ports: { groups: { out: { position: "bottom" } }, items: [{ id: "s", group: "out" }] } });
     netGraph.addNode({ id: "BUSUPS", x: ux, y: busY, width: 170, height: 22, shape: "rect", zIndex: 5,
       attrs: { body: { fill: "#c62828", stroke: "#c62828", rx: 3 }, label: { text: "шина ИБП", fill: "#fff", fontSize: 10, fontWeight: 700 } },
-      ports: { groups: { out: { position: { name: "line", args: { start: [14, 22], end: ["94%", 22] } }, attrs: { circle: { r: 2.5, magnet: true, stroke: "#c62828", fill: "#fff" } } }, items: upsRows.map(function (r, j) { return { id: "pu" + j, group: "out" }; }) } } });
+      ports: { groups: { out: { position: { name: "line", args: { start: [14, 22], end: ["94%", 22] } }, attrs: { circle: { r: 2.5, magnet: true, stroke: "#c62828", fill: "#fff" } } }, items: upsRows.map(function (r2, j) { return { id: "pu" + j, group: "out" }; }) } } });
     netGraph.addEdge({ source: { cell: "SRCUPS", port: "s" }, target: { cell: "BUSUPS" }, attrs: { line: { stroke: "#c62828", strokeWidth: 1.6, targetMarker: null } } });
     upsRows.forEach(function (r, j) {
       var c = byId[r.id] || {};
@@ -982,15 +1042,68 @@ function renderNet(reset) {
         attrs: { line: { stroke: "#c62828", strokeWidth: 1.2, strokeDasharray: "3 2" } }, router: "normal" });
     });
   }
-  netGraph.zoomToFit({ padding: 24, minScale: 0.45, maxScale: 1 });
-  $("net-note").textContent = "Узлов: " + netGraph.getNodes().length + " · связей: " + netGraph.getEdges().length + " (чёрный — рабочие цепи; оранжевый пунктир — резерв/ДЭС; красный — шина ИБП/СПЗ; связи ортогональные: manhattan-роутер; двигайте узлы, колесо — масштаб)";
+  // вернуть ручные позиции
+  netGraph.getNodes().forEach(function (n) { var pp = APP.netPos[n.id]; if (pp && !reset) n.setPosition(pp.x, pp.y); });
+  try {
+    var bx = document.getElementById('netbox');
+    bx.style.height = "660px"; bx.style.width = "100%";
+    netGraph.resize(bx.clientWidth || 1200, 660);
+  } catch (e) {}
+  netGraph.zoomToFit({ padding: 30, maxScale: 1 });
+  window.__NET = netGraph; window.__NET_ADD = addBlock;
+  $("net-note").textContent = "Узлов: " + netGraph.getNodes().length + " · связей: " + netGraph.getEdges().length +
+    " — тяните потребителей мышью, связи пересчитываются; правый маркер связи = переподключить; ✕ на узле/связи = удалить (двойной клик по узлу — переименовать). Палитра слева: блок взять мышью в поле; «КМ АВР» — мост между ближайшими шинами. Композиция сохраняется в JSON.";
   $("netcard").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+function addBlock(kind, pt, label) {
+  if (!netGraph) return null;
+  var d = BLK_DEFS[kind] || BLK_DEFS.load;
+  var id = "B" + (++netGraph._bcounter || (netGraph._bcounter = 1));
+  var n = netGraph.addNode({ id: id, x: pt.x - d.w / 2, y: pt.y - d.h / 2, width: d.w, height: d.h, shape: "rect",
+    attrs: { body: { fill: d.fill, stroke: d.stroke, rx: 4 }, label: { text: label || d.label, fontSize: 8.5, fill: d.textFill || "#223344", fontWeight: d.textBold ? 700 : 400 } },
+    ports: blkPorts() });
+  APP.netPos[id] = n.getPosition();
+  return n;
+}
+function ensurePalette() {
+  var host = $("n2-palette"); if (host && host._set) return;
+  host = host || (function () { var d = document.createElement("div"); d.id = "n2-palette"; $("netbox").parentNode.insertBefore(d, $("netbox")); d.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 6px"; return d; })();
+  host._set = 1;
+  var items = [["src", "Источник/Т"], ["gen", "ДЭС"], ["ibp", "ИБП"], ["bus", "Шина 0,4"], ["qf", "Автомат QF"], ["km", "КМ (Э)/(М)"], ["load", "Потребитель"], ["mtr", "Двигатель"], ["xt", "Клеммы"], ["note", "Текст"]];
+  host.innerHTML = "Блоки: " + items.map(function (it) { return '<span class="chip2" draggable="true" data-blk="' + it[0] + '" style="border:1px solid var(--line);background:#fff;border-radius:6px;padding:2px 8px;font-size:12px;cursor:grab">' + it[1] + "</span>"; }).join(" ");
+  var box = $("netbox");
+  host.addEventListener("dragstart", function (e) { var c = e.target.closest ? e.target.closest("[data-blk]") : null; if (c) { e.dataTransfer.setData("text/plain", "blk:" + c.getAttribute("data-blk")); e.dataTransfer.effectAllowed = "copy"; } });
+  Array.prototype.forEach.call(host.querySelectorAll("[data-blk]"), function (c) {
+    c.addEventListener("dragstart", function (e) { e.dataTransfer.setData("text/plain", "blk:" + c.getAttribute("data-blk")); });
+    c.addEventListener("dblclick", function () { if (netGraph) addBlock(c.getAttribute("data-blk"), netGraph.clientToLocal(box.getBoundingClientRect().x + 60, box.getBoundingClientRect().y + 60)); });
+    c.addEventListener("click", function () { if (netGraph) { netGraph._armed = (netGraph._armed === c.getAttribute("data-blk")) ? null : c.getAttribute("data-blk");
+      Array.prototype.forEach.call(host.querySelectorAll("[data-blk]"), function (x) { x.style.background = "#fff" }); 
+      if (netGraph._armed) { c.style.background = "#dcebff"; var nn = document.getElementById("net-note"); if (nn) nn.textContent = "Кликните свободное место на схеме — блок поставится туда (повторный клик по палитре — отмена)"; } } });
+  });
+  box.addEventListener("dragover", function (e) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
+  box.addEventListener("drop", function (e) {
+    e.preventDefault();
+    var d = (e.dataTransfer.getData("text/plain") || "").split(":");
+    if (d[0] === "blk" && netGraph) {
+      var kind = d[1]; var p = netGraph.clientToLocal(e.clientX, e.clientY);
+      if (kind === "km") {
+        var b = netGraph.getNodes().filter(function (n) { return /^BUS\d+$/.test(n.id); }).map(function (n) { return { n: n, c: n.getBBox().center() }; });
+        b.sort(function (x, y) { return x.c.x - y.c.x; });
+        var km = addBlock("km", p, "KM (Э)/(М)");
+        if (km && b.length >= 2) {
+          var l = b[0].n, r = b[1].n;
+          netGraph.addEdge({ source: { cell: l.id, anchor: { name: "right" } }, target: { cell: km.id, port: "i_left" }, router: "normal", attrs: { line: { stroke: "#1b6ef3", strokeWidth: 1.4 } } });
+          netGraph.addEdge({ source: { cell: r.id, anchor: { name: "left" } }, target: { cell: km.id, port: "i_top" }, router: "normal", attrs: { line: { stroke: "#1b6ef3", strokeWidth: 1.4, strokeDasharray: "4 3" } } });
+        }
+      } else addBlock(kind, p);
+    }
+  });
 }
 
 function boot() {
   ["tpl", "un", "skz", "tr1", "tr2", "uk", "dg", "upsn", "krt", "ko", "costg", "krman"].forEach(function (id) { if (!$(id)) console.warn("no input", id); });
   renderGrid(); wire();
 }
-window.N2 = { state: state, get res() { return APP.res; }, get conf() { return APP.conf; }, get secCalc() { return APP.secCalc; }, get phaseAssign(){return APP.phaseAssign;}, get skew(){return APP.skew;}, get warns(){return APP.warns;}, recalc: recalc, lookupKr: lookupKr, rtmGroup: rtmGroup, rtmPower: rtmPower, selectRow: selectRow, rowIrOf: rowIrOf };
+window.N2 = { state: state, get res() { return APP.res; }, get conf() { return APP.conf; }, get secCalc() { return APP.secCalc; }, get phaseAssign(){return APP.phaseAssign;}, get skew(){return APP.skew;}, get warns(){return APP.warns;}, get netPos(){return APP.netPos;}, recalc: recalc, lookupKr: lookupKr, rtmGroup: rtmGroup, rtmPower: rtmPower, selectRow: selectRow, rowIrOf: rowIrOf };
 
 })();

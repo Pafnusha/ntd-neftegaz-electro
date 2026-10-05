@@ -40,7 +40,7 @@
       .then(function () { status("Установка ezdxf/eldraw…"); return py.runPythonAsync("import micropip\nawait micropip.install('" + V + "pyparsing-3.3.3-py3-none-any.whl')\nawait micropip.install('" + V + "typing_extensions-4.16.0-py3-none-any.whl')\nawait micropip.install('" + V + "fonttools-4.66.1-py3-none-any.whl')\nawait micropip.install('" + V + "ezdxf-1.4.4-py3-none-any.whl')\nawait micropip.install('" + V + "eldraw-0.1.0-py3-none-any.whl')"); })
       .then(function () {
         if (bridgeSrc) return bridgeSrc;
-        return fetch(V + "eldraw-bridge.py").then(function (r) { return r.text(); }).then(function (t) { bridgeSrc = t; return t; });
+        return fetch(V + "eldraw-bridge.py?v=3").then(function (r) { return r.text(); }).then(function (t) { bridgeSrc = t; return t; });
       })
       .then(function (t) { status("Компиляция моста…"); py.globals.set("_BRIDGE", t); return py.runPythonAsync("import sys, types\nmod = types.ModuleType('eldraw_bridge_web')\nexec(compile(_BRIDGE, 'eldraw_bridge.py', 'exec'), mod.__dict__)\nsys.modules['eldraw_bridge_web'] = mod"); });
   }

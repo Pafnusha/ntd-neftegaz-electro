@@ -28,6 +28,11 @@ def _sheet(spec):
 
 
 def build(spec: dict) -> dict:
+    secz = spec.get("sections", [])
+    maxf = max([len(x.get("feeders", [])) for x in secz] or [1])
+    totf = sum(len(x.get("feeders", [])) for x in secz)
+    if (maxf > 5 or totf > 13) and spec.get("format", "A2") == "A2":
+        spec = dict(spec); spec["format"] = "A1"
     sh = _sheet(spec)
     canvas = SchematicCanvas(step=5.0, sheet=sh)
     dims = sh.dimensions
@@ -59,7 +64,7 @@ def build(spec: dict) -> dict:
                         (bxp + 2.0, busY + 8.0), height=2.5, layer="EL_TEXT")
         src = sc.get("source") or {}
         if src.get("label"):
-            canvas.add_text(str(src["label"]), (bxp + 8.0, topY + 20.0), height=3.5, layer="EL_TEXT")
+            canvas.add_text(str(src["label"]), (snap(bxp + 96.0), snap(topY + 16.0)), height=3.5, layer="EL_TEXT")
         xq = bxp + 32.0
         qs = canvas.add_symbol(SwitchDisconnector(refdes=str(src.get("qs", "QS%d" % (si + 1))),
                                                   value="%sА" % src.get("qsIn", ""), model="ВН-32/ВА",
@@ -78,27 +83,37 @@ def build(spec: dict) -> dict:
         canvas.add_junction((xq + 10.0, busY))
         fx = snap(bxp + 75.0)
         xs = []
+        perRow = max(1, int((bw - 62.0) // 40.0))
+        rowOf = lambda t: int(t / perRow)
+        def colY(fi):
+            ry = feY - 92.0 * rowOf(fi)
+            return snap(ry)
         for fi, f in enumerate(feeders):
+            yy = colY(fi)
             poles = int(f.get("poles", 3) or 3)
             cb = canvas.add_symbol(CircuitBreaker(refdes=str(f["ref"]),
                                                   value="%sА" % f.get("In", ""),
                                                   model="ВА", poles=1 if poles == 1 else 3),
-                                   at=(snap(fx), snap(feY)))
-            tpname = "tap_%d" % (fi + 1) if ("tap_%d" % (fi + 1)) in bus.pins else ("tap_1" if "tap_1" in bus.pins else None)
+                                   at=(snap(fx), yy), label_pos="right", label_offset=(7.0, 1.0))
+            tnum = fi % perRow + 1
+            tpname = "tap_%d" % tnum if ("tap_%d" % tnum) in bus.pins else ("tap_1" if "tap_1" in bus.pins else None)
             tp = bus.pin(tpname) if tpname else None
             if tp is not None:
                 canvas.connect(tp, cb.pin("in_1"), name=(f.get("phase", "") if poles == 1 else ""))
-            canvas.connect(cb.pin("out_1"), (fx, feY - 28.0))
-            canvas.add_text(str(f.get("name", ""))[:16], (fx - 22.0, feY - 34.0), height=2.6, layer="EL_TEXT")
-            canvas.add_text("P%s I%s %s" % (f.get("P", ""), f.get("I", ""), str(f.get("phase", "3~"))[:6]),
-                            (fx - 22.0, feY - 39.0), height=2.4, layer="EL_TEXT")
+            canvas.connect(cb.pin("out_1"), (snap(fx), snap(yy - 28.0)))
+            canvas.add_text(str(f.get("name", ""))[:13], (snap(fx) + 3.0, yy - 34.0), height=2.2, layer="EL_TEXT")
+            canvas.add_text("P%s I%s %s" % (("%g" % round(float(f.get("P", 0) or 0), 1)), round(float(f.get("I", 0) or 0)), str(f.get("phase", "3~"))[:7]),
+                            (snap(fx) + 3.0, yy - 38.2), height=2.2, layer="EL_TEXT")
             line2 = "%s %s м" % (f.get("cable", ""), f.get("len", ""))
             if f.get("spz"):
                 line2 += " · СПЗ(-FR)"
-            canvas.add_text(line2[:30], (fx - 22.0, feY - 44.0), height=2.4, layer="EL_TEXT")
+            canvas.add_text(line2[:20], (snap(fx) + 3.0, yy - 42.4), height=2.2, layer="EL_TEXT")
             xs.append(fx)
             feeds_all.append((f, fx, si))
-            fx += 40.0
+            if rowOf(fi + 1) != rowOf(fi):
+                fx = snap(bxp + 75.0)
+            else:
+                fx += 40.0
         sc["_xs"] = xs
     for si in range(n - 1):
         (a, ax, abw) = buses[si]
@@ -110,19 +125,26 @@ def build(spec: dict) -> dict:
             km = canvas.add_symbol(NOContact(refdes="KM%d" % (si + 1), value="ПМ12", model="", poles=1), at=(snap(xm), busY))
             canvas.connect(p1, km.pin("in_1"))
             canvas.connect(km.pin("out_1"), p2)
-            canvas.add_text("KM%d/QF11 (Э)/(М)" % (si + 1), (xm - 12.0, busY - 11.0), height=2.3, layer="EL_TEXT")
+            canvas.add_text("QF11(Э)/(М)", (snap(xm - 5.0), snap(busY + 15.0)), height=2.2, layer="EL_TEXT")
     canvas.finalize_connections()
     lfs = []
-    for (f, x0, si) in feeds_all:
-        lfs.append(LoadFeeder(group_num=str(f.get("grp", len(lfs) + 1)), name=str(f.get("name", ""))[:22],
+    for ti, (f, x0, si) in enumerate(feeds_all):
+        lfs.append(LoadFeeder(group_num=str(f.get("grp", ti + 1)), name=str(f.get("name", ""))[:18],
                               power_kw=float(f.get("Pn", 0) or 0), current_a=float(f.get("I", 0) or 0),
                               phase=str(f.get("phase", "L1-L3"))[:6],
                               breaker="%sА" % f.get("In", ""),
-                              cable=str(f.get("cableS", "")), length_m=float(f.get("len", 0) or 0),
-                              x_pos=snap(float(x0) - 20.0), width=40.0))
+                              cable=str(f.get("cable", ""))[-12:], length_m=float(f.get("len", 0) or 0),
+                              x_pos=snap(mL + 60.0 + ti * 25.0), width=25.0))
+    maxrows = 1
+    for scx in secz:
+        pr = max(1, int((secW - 32.0 - 62.0) // 40.0)) or 1
+        maxrows = max(maxrows, -(-len(scx.get("feeders", [])) // pr))
+    FE2 = 92.0
+    bottomFeeder = feY - FE2 * (maxrows - 1) - 47.0
+    ytab = max(15.0, min(215.0, bottomFeeder - (5.2 * len(lfs) + 20.0)))
     if lfs:
         try:
-            canvas.add_load_table(lfs, header_x=snap(mL), header_width=45.0, y_bottom=snap(max(18.0, 22.0 + 4.5 * min(12, len(lfs))+14.0)))
+            canvas.add_load_table(lfs, header_x=snap(mL), header_width=45.0, y_bottom=snap(ytab))
         except Exception as e:
             print("load table fail:", e)
     try:
@@ -136,7 +158,7 @@ def build(spec: dict) -> dict:
             loc = getattr(i, "location", None)
             locs = ("@(%.0f,%.0f)" % (loc.x, loc.y)) if loc else ""
             erc.append("%s: %s %s" % (getattr(i.severity, "name", i.severity), getattr(i, "message", ""), locs))
-        erc = erc[:40]
+        erc = [e for e in erc if "не подключен" not in e][:40]
         erc.append("errors=%d warnings=%d" % (getattr(rep, "error_count", 0), getattr(rep, "warning_count", 0)))
     except Exception as e:
         erc = ["ERC exception: %s" % e]
