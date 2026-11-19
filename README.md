@@ -5,6 +5,7 @@
 ## Ссылки
 
 - Главная: https://pafnusha.github.io/ntd-neftegaz-electro/
+- Расчёт уставок РЗА 6–35 кВ: https://pafnusha.github.io/ntd-neftegaz-electro/rza.html
 - НТД РФ: https://pafnusha.github.io/ntd-neftegaz-electro/ntd.html
 - Расчёт и выбор ИБП: https://pafnusha.github.io/ntd-neftegaz-electro/ibp.html
 - ИИ в проект (инструкция + конфигуратор): https://pafnusha.github.io/ntd-neftegaz-electro/ii-v-proekt/index.html
